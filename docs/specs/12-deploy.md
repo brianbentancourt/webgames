@@ -1,0 +1,122 @@
+# 12 · Deploy
+
+Lo que hay que hostear son dos cosas distintas: **un proceso vivo** con estado en
+memoria y sockets abiertos, y **dos bundles estáticos**.
+
+## La restricción que decide todo
+
+El estado vive en un proceso (`D4`). Una sala son sockets abiertos + timers de fase
++ estado mutable durante 25 minutos. Eso descarta de entrada todo lo serverless:
+funciones que se apagan entre requests no pueden sostener una partida.
+
+Y hay un corolario que se paga caro si se descubre tarde: **no se puede correr con
+dos réplicas detrás de un balanceador round-robin.** Si el celular de Vale cae en
+la instancia A y la TV en la B, la sala existe en una sola de las dos y no hay
+error visible, sólo un juego que no anda.
+
+Mientras el estado esté en memoria: **una instancia sola, escalada para arriba.**
+No es una limitación real a esta escala — 25 minutos por partida, 10 personas por
+sala, unos KB por transición: un proceso chico aguanta cientos de salas simultáneas.
+Si algún día hay que escalar horizontal, la respuesta es ruteo por afinidad de sala,
+no réplicas ciegas.
+
+## Las tres formas, de menos a más
+
+### 1 · La laptop, en la misma red
+
+Para las primeras mesas no hace falta desplegar nada. Todos están en el mismo living
+y en el mismo wifi:
+
+```
+pnpm dev            # server 8787, tv 5173, control 5174
+```
+
+Vite ya levanta con `host: true`, así que los celulares entran por la IP de la
+laptop. Cero infraestructura, cero costo, y el ciclo de iteración más rápido que vas
+a tener.
+
+**Limitación**: sin HTTPS no hay Cast. La TV va con un cable HDMI o con la laptop
+enchufada al televisor.
+
+### 2 · Un servicio, un dominio · **recomendado para el MVP**
+
+El servidor Node sirve **también** los estáticos de `tv` y `control`. Un solo
+proceso, un solo dominio, un solo deploy.
+
+```
+travesia.app/           → apps/tv/dist
+travesia.app/control    → apps/control/dist
+travesia.app/ws         → el WebSocket
+```
+
+Ventajas que no son menores: **mismo origen** (sin CORS, sin mixed content, sin
+variable de entorno apuntando a otro host) y **una sola cosa que puede estar caída**.
+El costo es no tener CDN, que a esta escala no compra nada: los bundles son chicos y
+el público está a 30 ms.
+
+| Dónde | Por qué | Costo |
+|---|---|---|
+| **Fly.io** | Máquinas persistentes, WS de primera, y región en Buenos Aires (`eze`) o São Paulo (`gru`) — importa cuando todos los jugadores están en el Río de la Plata | ~US$3–5/mes |
+| **Railway** | El más simple: conectás el repo y anda. Sin región sudamericana propia | ~US$5/mes |
+| **VPS + Caddy** (Hetzner, DigitalOcean) | Control total y TLS automático con Caddy. A cambio, el mantenimiento es tuyo | ~US$4/mes |
+
+**Render en plan gratuito no sirve**: duerme el servicio por inactividad y despertar
+tarda decenas de segundos. Es exactamente el momento en que cinco personas están
+esperando frente a la tele.
+
+### 3 · Estáticos aparte, cuando haya tráfico
+
+`apps/tv` y `apps/control` a Cloudflare Pages o Netlify (gratis, CDN), el servidor
+donde esté. Ahí sí aparecen CORS y una `VITE_SERVIDOR` apuntando a otro host, y
+`tv` y `control` pasan a poder quedar desincronizados del servidor entre deploys.
+Vale la pena recién cuando el CDN compre algo.
+
+## Lo que hay que tener sí o sí
+
+**WSS, no WS.** Los celulares abren una página HTTPS y el navegador no deja abrir un
+socket inseguro desde ahí. Cualquiera de las opciones de arriba da TLS; lo que no se
+puede es servir la página por HTTPS y el socket por `ws://`.
+
+**Keep-alive.** Casi todos los proxies cierran un WebSocket ocioso al minuto, y este
+juego tiene tres minutos de silencio de red mientras la mesa discute. El `ping` cada
+25 segundos ya está en el protocolo ([04](04-protocolo.md)) y no es opcional en
+producción.
+
+**Deploy sincronizado.** Cliente y servidor hablan la misma `VERSION_PROTOCOLO` y no
+hay compatibilidad hacia atrás: se despliegan juntos.
+
+**Una partida en curso no sobrevive a un deploy.** El estado está en memoria. Con
+25 minutos por partida y salas que se abren de noche, alcanza con desplegar cuando
+no hay salas activas; un chequeo antes de reiniciar es media hora de trabajo y evita
+cortar una travesía en la noche 4.
+
+## Variables de entorno
+
+| Variable | Dónde | Sin ella |
+|---|---|---|
+| `PUERTO` | servidor | 8787 |
+| `ANTHROPIC_API_KEY` | servidor | El juego corre entero con los respaldos de cada tablero |
+| `MODELO` | servidor | El rápido y barato por defecto |
+| `VITE_SERVIDOR` | clientes | `ws://localhost:8787`. En la opción 2 no hace falta: mismo origen |
+
+## Google Cast
+
+El receiver es una web app (`D13`), así que es la misma build de `apps/tv` servida
+por HTTPS. Lo que hay que saber antes de contarlo como hecho:
+
+- Hay que registrar la app en la Cast SDK Developer Console, con un **pago único de
+  US$5**.
+- El receiver se registra con una URL fija: cambiar de host obliga a volver a la
+  consola.
+- Para probar hay que registrar el Chromecast propio como dispositivo de desarrollo,
+  y tarda un rato en propagarse.
+
+Nada de eso es difícil, pero es un día de trabajo con esperas, no una tarde. Va en
+M5 ([10](10-roadmap.md)), no antes.
+
+## Lo que no se despliega todavía
+
+Base de datos: no hay. Si algún día hay que persistir una partida, se persiste **la
+semilla y el log de comandos**, no el estado — el motor es determinista y reconstruye
+el resto ([11](11-testing.md)). Son unos KB por travesía y sirve igual para
+compartir una crónica que para reproducir un bug.

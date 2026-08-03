@@ -24,20 +24,19 @@ y rival — nunca protagonista.
 
 ## Estado
 
-Prototipo del tablero de TV funcionando (escena de fogata, animación de avance, relato
-generado por modelo). Sin servidor, sin salas, sin celulares todavía.
-
 | Pieza | Estado |
 |---|---|
-| Tablero TV (render) | prototipo |
-| Motor de reglas | no empezado |
-| Salas / websockets | no empezado |
-| Cliente celular | no empezado |
-| Relato por LLM | prototipo (llamada directa) |
+| Tipos, vistas y protocolo | ✅ |
+| Salas y lobby | ✅ |
+| Tableros como datos | ✅ dos, La Sierra y El Salitral |
+| Motor de reglas | ❌ especificado, sin implementar |
+| Tablero TV (render) | ⚠️ solo la pantalla de sala |
+| Cliente celular | ⚠️ entrar y marcarse listo |
+| Relato por LLM | ⚠️ corre entero con los textos de respaldo |
 
 ---
 
-## Estructura prevista
+## Estructura
 
 ```
 /apps
@@ -48,9 +47,23 @@ generado por modelo). Sin servidor, sin salas, sin celulares todavía.
   /core        tipos y máquina de estados compartida
   /tableros    escenarios como datos (paleta, tramos, mazos, voz)
 /docs
-  diseno.md    diseño del juego
+  diseno.md      diseño del juego
   decisiones.md  por qué las cosas son como son
+  /specs         cómo se implementa
 ```
+
+## Cómo se corre
+
+```
+pnpm install
+pnpm dev          # servidor 8787 · tv 5173 · control 5174
+```
+
+Los celulares entran por la IP de la máquina en la misma red: alcanza para las
+primeras mesas y no hace falta desplegar nada. Sin `ANTHROPIC_API_KEY` el juego
+funciona igual, con los textos de respaldo de cada tablero.
+
+`pnpm -r typecheck` · `pnpm test`
 
 ## Decisión de arquitectura que sostiene todo
 
@@ -70,3 +83,12 @@ en el futuro sea una carcasa alrededor del mismo cliente web, no un port del jue
 
 Motor de reglas de una noche completa, en memoria, sin red y sin UI. Si el loop de una noche
 no es interesante en una terminal, no lo va a salvar ninguna animación.
+
+Las reglas ya están escritas en [`docs/specs/03-reglas-de-resolucion.md`](docs/specs/03-reglas-de-resolucion.md);
+falta el cuerpo de `reducir()`.
+
+## Documentación
+
+- [`docs/diseno.md`](docs/diseno.md) — qué juego es
+- [`docs/decisiones.md`](docs/decisiones.md) — por qué es así, con lo que se descartó
+- [`docs/specs/`](docs/specs/) — cómo se implementa, trece documentos cortos
