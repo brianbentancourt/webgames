@@ -1,0 +1,27 @@
+services:
+  juegos:
+    build: .
+    restart: unless-stopped
+    # Solo escucha en la red local: a internet se sale por el túnel, no por el
+    # router. No hay ningún puerto abierto hacia afuera.
+    ports:
+      - '8787:8787'
+    environment:
+      # Sin clave el juego corre entero con los textos de respaldo de cada tablero.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:8787/salud']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # Publica el servicio de arriba en un hostname propio con HTTPS y WSS, sin
+  # abrir puertos. Ver deploy/cloudflared/README.md para sacar el token.
+  tunel:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?falta TUNNEL_TOKEN, ver deploy/cloudflared/README.md}
+    depends_on:
+      - juegos

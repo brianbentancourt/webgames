@@ -1,0 +1,93 @@
+/*
+ * Una acción por pantalla. Diez segundos de celular por ronda como máximo (D1):
+ * si hay que leer para entender qué hacer, la mesa se queda en silencio mirando
+ * el teléfono, que es justo lo que este juego no quiere ser.
+ */
+
+:root {
+  --fondo: #0b1020;
+  --tinta: #e8e2d6;
+  --brasa: #ff7a3c;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body,
+#raiz {
+  min-height: 100%;
+}
+
+body {
+  background: var(--fondo);
+  color: var(--tinta);
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 18px;
+}
+
+.pantalla {
+  min-height: 100dvh;
+  padding: max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  justify-content: center;
+}
+
+.titulo {
+  font-size: 15px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0.55;
+}
+
+/* La línea del tutorial encubierto: es para decirla en voz alta, no para pensarla. */
+.linea {
+  font-size: 26px;
+  line-height: 1.35;
+}
+
+input,
+button {
+  font: inherit;
+  width: 100%;
+  /* 64px de alto: se toca sin mirar y sin errarle. */
+  min-height: 64px;
+  border-radius: 14px;
+  border: 1px solid rgba(232, 226, 214, 0.25);
+  background: transparent;
+  color: var(--tinta);
+  padding: 0 18px;
+}
+
+input {
+  text-align: center;
+  letter-spacing: 0.3em;
+  font-size: 30px;
+}
+
+button {
+  background: var(--brasa);
+  border: none;
+  color: #16100c;
+  font-weight: 600;
+}
+
+button:disabled {
+  opacity: 0.35;
+}
+
+button.secundario {
+  background: transparent;
+  color: var(--tinta);
+  border: 1px solid rgba(232, 226, 214, 0.25);
+}
+
+.error {
+  color: var(--brasa);
+  font-size: 15px;
+}

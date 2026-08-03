@@ -131,3 +131,52 @@ de importar y se puso a mirar el teléfono.
 
 Cada sistema nuevo es una regla más que explicar. El techo no es cuánto se le puede meter:
 es cuánto puede sostener una conversación de cinco personas sin que alguien mire el celular.
+
+---
+
+### D16 — Vite y un proceso Node propio, no un framework de páginas
+
+Estos juegos no tienen páginas: tienen un socket abierto durante 25 minutos y estado
+mutable en memoria. Routing, SSR, SEO y data fetching por request —que es lo que un
+framework de páginas resuelve bien— no aplican a nada de esto.
+
+**Descartado Next.js**: no sirve WebSockets (los route handlers no hacen protocol
+upgrade), así que igual habría que correr un proceso Node aparte; y su modelo de
+despliegue es stateless, cuando acá una sala *es* estado que vive entre requests.
+Terminás con la misma arquitectura de dos procesos, pagando Next en el medio. Vale
+igual para SvelteKit y compañía: cambia la sintaxis, no el desajuste.
+
+**Descartado Colyseus / Nakama**: traen matchmaking y sincronización por deltas, que
+son el 80% de lo que no usamos, y su modelo pelea con D4 — acá se manda el estado
+entero por transición, no parches por tick.
+
+**Descartado, con ganas, Cloudflare Durable Objects**: un DO *es* una sala con
+estado, y la hibernación de WebSockets está hecha para conexiones que pasan minutos
+en silencio. Queda como la mejor opción si el hosting alguna vez tiene que ser
+gratis y siempre disponible. No es hoy porque ata el servidor a un runtime que no es
+Node y complica correr todo en una laptop, que es donde se prueba.
+
+Corolario que se paga caro si se descubre tarde: **mientras el estado esté en
+memoria, una sola instancia.** Dos réplicas detrás de un balanceador parten las salas
+por la mitad sin dar ningún error visible.
+
+---
+
+### D17 — Un repo con varios juegos, una carpeta por juego
+
+Un juego es una carpeta en `/juegos` con todo lo suyo adentro: reglas, datos, sus dos
+clientes y sus docs. Lo común —el menú y el proceso que sirve todo— vive en `/apps`.
+
+**Descartado agrupar por tipo** (`/apps/travesia-tv`, `/apps/otrojuego-tv`,
+`/packages/travesia-core`…): con cuatro juegos son doce carpetas hermanas y hay que
+leer el prefijo para saber qué va con qué. Agrupar por juego hace que agregar uno sea
+agregar una carpeta, y que borrarlo sea borrarla.
+
+**Descartado un motor genérico de party games.** Es la forma clásica de no terminar
+ninguno: se abstrae sobre un solo caso y la abstracción sale mal. La única costura
+compartida hoy es el registro de `apps/servidor/src/juegos.ts`, que es una lista. Lo
+que resulte común va a ser evidente recién con el segundo juego funcionando.
+
+**Un solo proceso y un solo hostname**, con los juegos colgando de rutas
+(`/travesia`, `/travesia/control`). Un juego más no es infraestructura más. Si alguna
+vez uno necesita su propio proceso —otro runtime, otra escala— ahí se le da el suyo.
