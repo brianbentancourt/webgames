@@ -1,0 +1,96 @@
+/*
+ * Se mira de reojo desde 3 metros, no se lee (diseno.md § Presentación en TV).
+ *  - tipografía mínima ~3% del alto de pantalla
+ *  - 5% de margen por overscan
+ *  - cero hover, cero scroll, todo en una pantalla
+ */
+
+:root {
+  --cielo: #0b1020;
+  --cerro-lejano: #2a3450;
+  --cerro-medio: #161d31;
+  --cerro-cercano: #080b14;
+  --brasa: #ff7a3c;
+  --tinta: #e8e2d6;
+
+  --overscan: 5vh;
+  --texto-min: 3vh;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body,
+#raiz {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background: var(--cielo);
+  color: var(--tinta);
+  font-family: ui-serif, Georgia, 'Times New Roman', serif;
+  font-size: var(--texto-min);
+  -webkit-font-smoothing: antialiased;
+}
+
+.pantalla {
+  height: 100%;
+  padding: var(--overscan) calc(var(--overscan) * 1.2);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.codigo {
+  font-size: 12vh;
+  letter-spacing: 0.12em;
+  color: var(--brasa);
+  line-height: 1;
+}
+
+.al-pie {
+  opacity: 0.55;
+  font-size: 2.4vh;
+}
+
+.viajeros {
+  display: flex;
+  gap: 3vw;
+  list-style: none;
+}
+
+.viajero {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6vh;
+}
+
+.viajero[data-listo='true'] {
+  color: var(--brasa);
+}
+
+/* La brasa respira. Ambiente permanente y bajo: nada compite con la resolución. */
+@keyframes respira {
+  0%,
+  100% {
+    opacity: 0.75;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.brasa {
+  animation: respira 4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brasa {
+    animation: none;
+  }
+}

@@ -1,0 +1,61 @@
+/**
+ * Conexión del celular.
+ *
+ * El token de sesión se guarda en localStorage: si a alguien se le bloquea el
+ * teléfono en la noche 3 tiene que volver a su asiento sin que la mesa lo espere.
+ */
+
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { MensajeEntrante, MensajeSaliente } from '@travesia/core';
+
+const URL_SERVIDOR = import.meta.env['VITE_SERVIDOR'] ?? 'ws://localhost:8787';
+const CLAVE_SESION = 'travesia.sesion';
+
+export function useConexion() {
+  const [estado, setEstado] = useState<'conectando' | 'abierta' | 'cerrada'>('conectando');
+  const [ultimo, setUltimo] = useState<MensajeSaliente | null>(null);
+  const socket = useRef<WebSocket | null>(null);
+
+  useEffect(() => {
+    let vivo = true;
+    let intento = 0;
+    let temporizador: ReturnType<typeof setTimeout>;
+
+    const conectar = () => {
+      if (!vivo) return;
+      setEstado('conectando');
+      const ws = new WebSocket(URL_SERVIDOR);
+      socket.current = ws;
+      ws.onopen = () => {
+        intento = 0;
+        setEstado('abierta');
+      };
+      ws.onmessage = (ev) => {
+        const msg = JSON.parse(ev.data as string) as MensajeSaliente;
+        if (msg.t === 'bienvenida' && msg.sesion !== undefined) {
+          localStorage.setItem(CLAVE_SESION, msg.sesion);
+        }
+        setUltimo(msg);
+      };
+      ws.onclose = () => {
+        setEstado('cerrada');
+        if (!vivo) return;
+        temporizador = setTimeout(conectar, Math.min(1000 * 2 ** intento++, 8000));
+      };
+    };
+
+    conectar();
+    return () => {
+      vivo = false;
+      clearTimeout(temporizador);
+      socket.current?.close();
+    };
+  }, []);
+
+  const mandar = useCallback((mensaje: MensajeEntrante) => {
+    const ws = socket.current;
+    if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(mensaje));
+  }, []);
+
+  return { estado, ultimo, mandar, sesionGuardada: () => localStorage.getItem(CLAVE_SESION) };
+}
