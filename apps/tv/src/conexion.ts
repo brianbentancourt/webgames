@@ -8,7 +8,14 @@
 import { useEffect, useRef, useState } from 'react';
 import type { MensajeEntrante, MensajeSaliente } from '@travesia/core';
 
-const URL_SERVIDOR = import.meta.env['VITE_SERVIDOR'] ?? 'ws://localhost:8787';
+export const URL_SERVIDOR: string =
+  import.meta.env['VITE_SERVIDOR'] ??
+  (import.meta.env.DEV
+    ? // En desarrollo el servidor está en otro puerto, pero en el MISMO host: si
+      // acá dijera "localhost", un celular entrando por la IP de la laptop
+      // buscaría el servidor dentro del propio teléfono.
+      `ws://${location.hostname}:8787/ws`
+    : `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
 
 export function useConexion() {
   const [estado, setEstado] = useState<'conectando' | 'abierta' | 'cerrada'>('conectando');

@@ -65,6 +65,16 @@ funciona igual, con los textos de respaldo de cada tablero.
 
 `pnpm -r typecheck` · `pnpm test`
 
+## Cómo se publica
+
+```
+docker compose up -d --build
+```
+
+Un contenedor que sirve los dos clientes y el WebSocket desde el mismo origen, más
+un túnel de Cloudflare que lo publica en un subdominio con HTTPS, sin abrir puertos
+en el router. Pasos en [`deploy/cloudflared/README.md`](deploy/cloudflared/README.md).
+
 ## Decisión de arquitectura que sostiene todo
 
 **El estado vive en el servidor. La TV solo se suscribe y pinta.** Las animaciones se disparan

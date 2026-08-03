@@ -8,13 +8,26 @@
  */
 
 import { createServer } from 'node:http';
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { VERSION_PROTOCOLO, leerEntrante, type MensajeSaliente } from '@travesia/core';
 import { TABLEROS, validarTableros } from '@travesia/tableros';
 import { config } from './config.js';
+import { crearEstaticos, type Montaje } from './estaticos.js';
 import { cerrarSala, crearSala, desconectar, obtenerSala, salaDe, unirse, type Sala } from './salas.js';
 
 validarTableros();
+
+const raizRepo = resolve(fileURLToPath(new URL('.', import.meta.url)), '../../..');
+const candidatos: Montaje[] = [
+  { prefijo: '/', raiz: resolve(raizRepo, 'apps/tv/dist') },
+  { prefijo: '/control/', raiz: resolve(raizRepo, 'apps/control/dist') },
+];
+// Sin builds no se monta nada: en desarrollo cada cliente lo sirve su propio Vite.
+const montajes = candidatos.filter((m) => existsSync(m.raiz));
+const servirEstaticos = montajes.length > 0 ? crearEstaticos(montajes) : null;
 
 const http = createServer((req, res) => {
   if (req.url === '/salud') {
@@ -22,10 +35,17 @@ const http = createServer((req, res) => {
     res.end(JSON.stringify({ ok: true, version: VERSION_PROTOCOLO }));
     return;
   }
+  if (servirEstaticos !== null) {
+    void servirEstaticos(req, res).then((atendido) => {
+      if (!atendido) res.writeHead(404).end();
+    });
+    return;
+  }
   res.writeHead(404).end();
 });
 
-const wss = new WebSocketServer({ server: http });
+// El socket vive en /ws para no pelear con las rutas de los estáticos.
+const wss = new WebSocketServer({ server: http, path: '/ws' });
 
 function enviar(socket: WebSocket | null, mensaje: MensajeSaliente): void {
   if (socket === null || socket.readyState !== socket.OPEN) return;

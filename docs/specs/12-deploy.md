@@ -3,6 +3,25 @@
 Lo que hay que hostear son dos cosas distintas: **un proceso vivo** con estado en
 memoria y sockets abiertos, y **dos bundles estáticos**.
 
+## Cómo se despliega hoy
+
+Un contenedor en una máquina que ya está prendida, publicado con Cloudflare Tunnel
+en un subdominio propio. Los pasos concretos están en
+[`deploy/cloudflared/README.md`](../../deploy/cloudflared/README.md).
+
+```
+travesia.brianbentancourt.com/          → la TV
+travesia.brianbentancourt.com/control   → el celular
+travesia.brianbentancourt.com/ws        → el WebSocket
+```
+
+Un solo origen, un solo hostname, un solo túnel, cero puertos abiertos en el router.
+El servidor sirve los `dist` de los dos clientes desde el mismo proceso que el
+socket (`apps/server/src/estaticos.ts`): en desarrollo no monta nada y cada cliente
+lo sirve su propio Vite.
+
+Todo lo que sigue es el porqué, y las alternativas para cuando esta deje de alcanzar.
+
 ## La restricción que decide todo
 
 El estado vive en un proceso (`D4`). Una sala son sockets abiertos + timers de fase
@@ -95,16 +114,16 @@ la conversación. La región de Fly en Buenos Aires es lindo tenerla, no es un r
 
 Con VPS, TLS lo resuelve **Caddy** en tres líneas de configuración y renueva solo.
 
-### La máquina que ya tenés
+### La máquina que ya tenés ← **la elegida**
 
 Cloudflare Tunnel es gratis y publica un proceso de tu casa en un hostname HTTPS
-propio, con WSS incluido y sin abrir puertos en el router. Una Raspberry Pi o un
-notebook viejo enchufado alcanzan de sobra.
+propio, con WSS incluido y sin abrir puertos en el router. Una Raspberry Pi, un
+notebook viejo o la PC de domótica alcanzan de sobra.
 
 Para un juego que se juega en tu living con tus amigos, es la opción más honesta:
-no hay servidor que mantener porque el servidor es una máquina que ya está prendida.
-Lo único que hace falta comprar es un dominio (~US$10/año) para tener una URL fija,
-que Cast necesita.
+no hay servidor que mantener porque el servidor es una máquina que ya está prendida,
+y el dominio ya está pago. Un mismo túnel publica varios hostnames, así que el
+segundo juego del repo no va a necesitar infraestructura nueva.
 
 ### Cloudflare Workers + Durable Objects
 

@@ -8,7 +8,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { MensajeEntrante, MensajeSaliente } from '@travesia/core';
 
-const URL_SERVIDOR = import.meta.env['VITE_SERVIDOR'] ?? 'ws://localhost:8787';
+export const URL_SERVIDOR: string =
+  import.meta.env['VITE_SERVIDOR'] ??
+  (import.meta.env.DEV
+    ? // Mismo host que sirvió la página, otro puerto. Es lo que hace que los
+      // celulares entren por la IP de la laptop sin configurar nada.
+      `ws://${location.hostname}:8787/ws`
+    : `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
+
 const CLAVE_SESION = 'travesia.sesion';
 
 export function useConexion() {
