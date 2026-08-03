@@ -71,6 +71,75 @@ donde esté. Ahí sí aparecen CORS y una `VITE_SERVIDOR` apuntando a otro host,
 `tv` y `control` pasan a poder quedar desincronizados del servidor entre deploys.
 Vale la pena recién cuando el CDN compre algo.
 
+## Gratis, en serio
+
+`apps/tv` y `apps/control` son estáticos: Cloudflare Pages, Netlify o Vercel los
+hostean gratis para siempre y ninguno es la parte difícil. **Lo único que cuesta es
+el proceso vivo.**
+
+Estas son las opciones que sostienen un proceso Node con sockets abiertos sin pagar.
+Ninguna es peor que las pagas para este juego; todas cuestan más tiempo de setup.
+
+### Un VPS que no vence
+
+| Dónde | Qué da | Letra chica |
+|---|---|---|
+| **Oracle Cloud Always Free** | Una VM ARM con hasta 4 vCPU y 24 GB, gratis sin vencimiento, con región en São Paulo | Conseguir capacidad ARM en las regiones populares puede llevar varios intentos, y Oracle se reserva reclamar instancias ociosas |
+| **Google Cloud `e2-micro` Always Free** | 1 vCPU compartida, 1 GB, gratis sin vencimiento | Sólo en regiones de EE.UU. |
+| AWS / Azure | `t3.micro` o `B1s` | Sólo 12 meses. Después se paga, y el corte llega cuando ya te olvidaste |
+
+Sobre la latencia de la opción de Google: desde el Río de la Plata a `us-east` hay
+~130 ms, **y a este juego no le importa**. Nadie hace clicks de precisión: se bloquea
+una boleta cada tres minutos y el reloj lo lleva el servidor. Los 130 ms se los come
+la conversación. La región de Fly en Buenos Aires es lindo tenerla, no es un requisito.
+
+Con VPS, TLS lo resuelve **Caddy** en tres líneas de configuración y renueva solo.
+
+### La máquina que ya tenés
+
+Cloudflare Tunnel es gratis y publica un proceso de tu casa en un hostname HTTPS
+propio, con WSS incluido y sin abrir puertos en el router. Una Raspberry Pi o un
+notebook viejo enchufado alcanzan de sobra.
+
+Para un juego que se juega en tu living con tus amigos, es la opción más honesta:
+no hay servidor que mantener porque el servidor es una máquina que ya está prendida.
+Lo único que hace falta comprar es un dominio (~US$10/año) para tener una URL fija,
+que Cast necesita.
+
+### Cloudflare Workers + Durable Objects
+
+El plan gratis alcanza para este juego, y es la opción que **mejor le calza a la
+forma del problema**: un Durable Object *es* una sala con estado, y la API de
+hibernación de WebSockets está hecha justo para conexiones que pasan minutos sin
+mandar nada — que es exactamente lo que hace este juego mientras la mesa discute.
+
+El costo es un rewrite de `apps/server`: hoy son unas 250 líneas contra `node:http`
+y `ws`, y habría que pasarlas al runtime de Workers (`fetch` + `WebSocketPair`).
+`packages/core` y `packages/tableros` no se tocan — no importan nada de Node, y esa
+es justamente la razón por la que están separados.
+
+No es la primera opción sólo porque ata el servidor a un runtime que no es Node y
+complica correr todo en una laptop. Si el hosting tiene que ser gratis y siempre
+disponible, es la mejor.
+
+### Lo que no sirve
+
+**Render en plan gratuito**: duerme por inactividad y despertar tarda decenas de
+segundos, justo cuando hay cinco personas mirando la tele. Se puede evitar
+despertándolo desde afuera cada pocos minutos, pero es una pieza más que se rompe
+sola un viernes a la noche.
+
+**Deno Deploy y cualquier cosa a base de isolates**: no garantizan que dos
+conexiones caigan en la misma instancia, que es el corolario del principio de este
+spec.
+
+**Railway y Fly**: los planes gratuitos ya no existen como tales — Railway pasó a
+crédito de prueba y Fly factura desde el arranque. Verificá al crear la cuenta,
+porque esto cambia seguido.
+
+> Lo de arriba se movió mucho en los últimos dos años. Antes de elegir, chequeá los
+> límites actuales de la que te interese en vez de confiar en esta tabla.
+
 ## Lo que hay que tener sí o sí
 
 **WSS, no WS.** Los celulares abren una página HTTPS y el navegador no deja abrir un
