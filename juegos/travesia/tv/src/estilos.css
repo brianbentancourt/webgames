@@ -198,7 +198,25 @@ body::before {
   align-items: center;
   gap: 0.6vh;
   opacity: 0.85;
-  transition: opacity 0.6s ease;
+  transition: opacity 0.6s steps(4, end);
+}
+
+.silueta-avatar-sombra {
+  filter: drop-shadow(4px 6px 0px rgba(0, 0, 0, 0.4));
+  transition: transform 0.6s steps(4, end);
+}
+
+/* Character status updates for silueta-avatar-sombra */
+.estado-cansado .silueta-avatar-sombra {
+  transform: rotate(5deg) translateY(1vh);
+}
+
+.estado-al_limite .silueta-avatar-sombra {
+  transform: rotate(-10deg) translateY(2vh);
+}
+
+.estado-quebrado .silueta-avatar-sombra {
+  transform: rotate(90deg) translateY(2vh) translateX(1vh);
 }
 
 .silueta-avatar,
@@ -208,8 +226,6 @@ body::before {
   background: #c2b59e; /* Color cartón base */
   clip-path: polygon(15% 5%, 85% 8%, 95% 95%, 5% 98%);
   transform: rotate(-2deg);
-  /* Sombra simulada dentro del marco del contenedor padre, o drop-shadow si el padre no corta */
-  box-shadow: inset 0 0 10px rgba(0,0,0,0.3);
 }
 
 /* Darle personalidad y colores a los recortes según el índice */
