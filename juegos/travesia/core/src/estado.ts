@@ -32,6 +32,8 @@ export interface Viajero {
   cegado: boolean;
   /** Aceptó el trato. Nunca lo hace perder: cambia el final y la crónica (D9). */
   aceptoElTrato: boolean;
+  /** Solo se usa en `lobby`, antes de que el motor asigne roles con `empezar`. */
+  listo?: boolean;
 }
 
 export interface EstadoPerro {

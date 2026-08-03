@@ -379,13 +379,65 @@ body::before {
   position: absolute;
   inset: 0;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 1.4vh;
+  padding: 0 10vw;
+  text-align: center;
 }
 
 .espera-texto {
   font-size: 3.4vh;
   opacity: 0.75;
+}
+
+.epilogo-titulo {
+  font-size: 4.2vh;
+  color: var(--brasa);
+}
+
+.epilogo-perro {
+  font-size: 2.4vh;
+  opacity: 0.85;
+}
+
+.epilogo-objetivos {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.4vh 1.6vw;
+  justify-content: center;
+  margin-top: 1vh;
+}
+
+.epilogo-objetivos li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3vh;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 1.2vh 1.6vw;
+  max-width: 26ch;
+  clip-path: polygon(2% 3%, 98% 1%, 97% 97%, 3% 98%);
+}
+
+.objetivo-cumplido {
+  border-left: 0.4vh solid var(--brasa);
+}
+
+.objetivo-fallado {
+  border-left: 0.4vh solid rgba(232, 226, 214, 0.25);
+  opacity: 0.7;
+}
+
+.objetivo-nombre {
+  font-size: 2vh;
+  color: var(--brasa);
+}
+
+.objetivo-texto {
+  font-size: 1.8vh;
+  opacity: 0.85;
 }
 
 /* Resolución: única cutscene dramática de la noche (D4 § tres niveles). */

@@ -1,14 +1,20 @@
 import { useState, useEffect } from 'react';
 import type { VistaJugador } from '@travesia/core';
-import { PantallaRuta, PantallaRaciones, PantallaEsfuerzo, PantallaBloquear, PantallaTrato } from './Acciones.js';
+import {
+  PantallaRuta,
+  PantallaRaciones,
+  PantallaEsfuerzo,
+  PantallaBloquear,
+  PantallaTrato,
+  PantallaEntregarObjeto,
+} from './Acciones.js';
 
 interface Props {
   vista: VistaJugador;
   mandar: (msg: any) => void;
-  nombreDe: (id: string) => string;
 }
 
-export function JuegoControl({ vista, mandar, nombreDe }: Props) {
+export function JuegoControl({ vista, mandar }: Props) {
   const [paso, setPaso] = useState(0);
   const [boleta, setBoleta] = useState<any>({});
 
@@ -57,7 +63,7 @@ export function JuegoControl({ vista, mandar, nombreDe }: Props) {
             {vista.revelacion.tipo === 'gente' && (
               <ul className="lista-revelacion">
                 {vista.revelacion.filas.map((f, i) => (
-                  <li key={i}>{nombreDe(f.nombre)}: {f.estado}</li>
+                  <li key={i}>{f.nombre}: {f.estado}</li>
                 ))}
               </ul>
             )}
@@ -97,7 +103,7 @@ export function JuegoControl({ vista, mandar, nombreDe }: Props) {
       mandar({ t: 'votar_tablero', tablero: valor });
       setPaso(paso + 1);
     } else if (accionActual.tipo === 'entregar_objeto') {
-      mandar({ t: 'entregar_objeto', a: valor });
+      mandar({ t: 'entregar_objeto', objeto: accionActual.objeto, a: valor });
       setPaso(paso + 1);
     } else if (accionActual.tipo === 'bloquear') {
       mandar({ 
@@ -125,13 +131,20 @@ export function JuegoControl({ vista, mandar, nombreDe }: Props) {
         <PantallaRaciones accion={accionActual as any} onSiguiente={(v) => handleSiguiente('raciones', v)} />
       )}
       {accionActual.tipo === 'elegir_esfuerzo' && (
-        <PantallaEsfuerzo accion={accionActual as any} onSiguiente={(v) => handleSiguiente('esfuerzo', v)} nombreDe={nombreDe} />
+        <PantallaEsfuerzo accion={accionActual as any} onSiguiente={(v) => handleSiguiente('esfuerzo', v)} />
       )}
       {accionActual.tipo === 'bloquear' && (
         <PantallaBloquear onSiguiente={(v) => handleSiguiente('bloquear', v)} />
       )}
       {accionActual.tipo === 'responder_trato' && (
         <PantallaTrato onSiguiente={(v) => handleSiguiente('trato', v)} />
+      )}
+      {accionActual.tipo === 'entregar_objeto' && (
+        <PantallaEntregarObjeto
+          accion={accionActual as any}
+          onEntregar={(v) => handleSiguiente('entregar_objeto', v)}
+          onOmitir={() => setPaso(paso + 1)}
+        />
       )}
     </main>
   );

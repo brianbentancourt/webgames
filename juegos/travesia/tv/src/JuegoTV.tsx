@@ -42,7 +42,7 @@ export function JuegoTV({ vista }: { vista: VistaTV }) {
         <Caravana
           viajeros={vista.viajeros}
           perro={vista.perro}
-          alertando={gatilloAlerta?.que === 'perro'}
+          {...(gatilloAlerta ? { alertaQue: gatilloAlerta.que } : {})}
         />
         <Fogata reloj={vista.reloj} mostrarDigitos={vista.mostrarDigitos} segundos={segundos} />
       </div>
@@ -80,7 +80,27 @@ export function JuegoTV({ vista }: { vista: VistaTV }) {
 
       {vista.fase === 'epilogo' && (
         <div className="panel-epilogo">
-          <p className="espera-texto">La travesía terminó. Miren la ronda final.</p>
+          {vista.desenlace ? (
+            <>
+              <h2 className="epilogo-titulo">
+                {vista.desenlace.llegaron ? 'Llegaron a destino.' : 'No llegaron a destino.'}
+              </h2>
+              <p className="epilogo-perro">
+                {vista.desenlace.perroLlego ? 'El perro llegó con ellos.' : 'El perro se perdió en el camino.'}
+              </p>
+              {vista.ultimaCronica && <p className="cronica-texto">{vista.ultimaCronica.relato}</p>}
+              <ul className="epilogo-objetivos">
+                {vista.desenlace.objetivos.map((o) => (
+                  <li key={o.jugador} className={o.cumplido ? 'objetivo-cumplido' : 'objetivo-fallado'}>
+                    <span className="objetivo-nombre">{o.nombre}</span>
+                    <span className="objetivo-texto">{o.texto}</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : (
+            <p className="espera-texto">La travesía terminó. Miren la ronda final.</p>
+          )}
         </div>
       )}
     </div>

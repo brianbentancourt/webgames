@@ -11,7 +11,7 @@ su ruta.
 
 | Juego | Jugadores | Dura | Estado |
 |---|---|---|---|
-| [La Travesía](juegos/travesia/) — una caravana cruza una sierra en cinco noches | 2 a 10 | 25 min | en obra |
+| [La Travesía](juegos/travesia/) — una caravana cruza una sierra en cinco noches | 2 a 10 | 25 min | jugable (sin voz de IA todavía) |
 
 ## Estructura
 

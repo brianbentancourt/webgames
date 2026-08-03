@@ -10,12 +10,15 @@ import {
   leerEntrante,
   type MensajeSaliente,
   reducir,
+  registrarTablero,
+  type TableroDato,
   proyectarTV,
   proyectarJugador,
   partidaId,
   type EstadoPartida,
   type Comando,
   type Efecto,
+  type Gatillo,
   type PedidoRelato,
   VIGOR_INICIAL,
   jugadorId,
@@ -30,6 +33,13 @@ import { randomUUID } from 'node:crypto';
 import { pedirRelato } from './llm/adaptador.js';
 
 validarTableros();
+// El motor de reglas no conoce los tableros por su cuenta: se los damos acá,
+// una sola vez, al arrancar. Antes esto pasaba como side-effect de importar
+// @travesia/tableros, que hacía que "quién registra qué" dependiera del orden
+// de imports en vez de estar escrito en un solo lugar.
+for (const tablero of TABLEROS) {
+  registrarTablero(tablero.id, tablero as unknown as TableroDato);
+}
 
 const montados = montajes();
 const servirEstaticos = montados.length > 0 ? crearEstaticos(montados) : null;
@@ -68,35 +78,34 @@ function publicarSala(sala: Sala, cuentaRegresiva?: number): void {
     publicarVistasPartida(sala, 'todos');
     return;
   }
-  const mensaje: MensajeSaliente = cuentaRegresiva !== undefined
-    ? {
-        t: 'sala',
-        codigo: sala.codigo,
-        jugadores: [...sala.asientos.values()].map((a) => ({
-          id: a.id,
-          nombre: a.nombre,
-          listo: a.listo,
-        })),
-        cuentaRegresiva,
-      }
-    : {
-        t: 'sala',
-        codigo: sala.codigo,
-        jugadores: [...sala.asientos.values()].map((a) => ({
-          id: a.id,
-          nombre: a.nombre,
-          listo: a.listo,
-        })),
-      };
+  const votos: Record<string, string> = {};
+  for (const [jugador, tablero] of sala.tableroVotado) votos[jugador] = tablero;
+
+  const mensaje: MensajeSaliente = {
+    t: 'sala',
+    codigo: sala.codigo,
+    jugadores: [...sala.asientos.values()].map((a) => ({
+      id: a.id,
+      nombre: a.nombre,
+      listo: a.listo,
+    })),
+    tableros: TABLEROS.map((t) => ({ id: t.id, nombre: t.nombre })),
+    votos,
+    ...(cuentaRegresiva !== undefined ? { cuentaRegresiva } : {}),
+  };
   enviar(sala.tv, mensaje);
   for (const asiento of sala.asientos.values()) enviar(asiento.socket, mensaje);
 }
 
-function publicarVistasPartida(sala: Sala, a: 'todos' | 'tv' | { jugador: JugadorId }): void {
+function publicarVistasPartida(
+  sala: Sala,
+  a: 'todos' | 'tv' | { jugador: JugadorId },
+  gatillos: Gatillo[] = [],
+): void {
   if (!sala.partida) return;
 
   if (a === 'todos' || a === 'tv') {
-    const vistaTV = proyectarTV(sala.partida);
+    const vistaTV = proyectarTV(sala.partida, undefined, gatillos);
     enviar(sala.tv, { t: 'tv', vista: vistaTV });
   }
 
@@ -119,8 +128,8 @@ function publicarVistasPartida(sala: Sala, a: 'todos' | 'tv' | { jugador: Jugado
 function aplicarEfectos(sala: Sala, efectos: Efecto[]): void {
   for (const ef of efectos) {
     if (ef.t === 'agendar') {
-      if (sala.timerId) clearTimeout(sala.timerId);
-      sala.timerId = setTimeout(() => {
+      if (sala.faseTimerId) clearTimeout(sala.faseTimerId);
+      sala.faseTimerId = setTimeout(() => {
         if (!sala.partida) return;
         const res = reducir(sala.partida, { t: 'vencio_fase' });
         if (res.ok) {
@@ -129,7 +138,7 @@ function aplicarEfectos(sala: Sala, efectos: Efecto[]): void {
         }
       }, ef.enMs);
     } else if (ef.t === 'publicar') {
-      publicarVistasPartida(sala, ef.a);
+      publicarVistasPartida(sala, ef.a, ef.gatillos ?? []);
     } else if (ef.t === 'pedir_relato') {
       void pedirRelatoLLM(sala, ef.pedido);
     } else if (ef.t === 'terminar') {
@@ -258,9 +267,13 @@ wss.on('connection', (socket) => {
         enviar(socket, { t: 'error', codigo: r.codigo, mensaje: 'no se pudo entrar' });
         return;
       }
-      if (sala.timerId) {
-        clearTimeout(sala.timerId);
-        delete sala.timerId;
+      // Cancela la cuenta regresiva de "todos listos" si alguien se sumó o
+      // volvió mientras contaba. Nunca toca `faseTimerId`: una partida en
+      // curso no tiene cuenta regresiva que cancelar, tiene un reloj de
+      // noche que no puede parar porque alguien reconectó (ver salas.ts).
+      if (!sala.partida && sala.lobbyTimerId) {
+        clearTimeout(sala.lobbyTimerId);
+        delete sala.lobbyTimerId;
       }
       enviar(socket, {
         t: 'bienvenida',
@@ -296,9 +309,9 @@ wss.on('connection', (socket) => {
       }
       const viajeros = [...sala.asientos.values()];
       const todosListos = viajeros.length >= 2 && viajeros.every((a) => a.listo);
-      if (!todosListos && sala.timerId) {
-        clearTimeout(sala.timerId);
-        delete sala.timerId;
+      if (!todosListos && sala.lobbyTimerId) {
+        clearTimeout(sala.lobbyTimerId);
+        delete sala.lobbyTimerId;
       }
       publicarSala(sala);
       return;
@@ -371,23 +384,23 @@ wss.on('connection', (socket) => {
         const viajeros = [...sala.asientos.values()];
         const todosListos = viajeros.length >= 2 && viajeros.every((a) => a.listo);
         if (todosListos) {
-          if (sala.timerId) return;
+          if (sala.lobbyTimerId) return;
           let segundosRestantes = 5;
           const tick = () => {
             if (segundosRestantes > 0) {
               publicarSala(sala, segundosRestantes);
               segundosRestantes--;
-              sala.timerId = setTimeout(tick, 1000);
+              sala.lobbyTimerId = setTimeout(tick, 1000);
             } else {
-              delete sala.timerId;
+              delete sala.lobbyTimerId;
               iniciarPartidaReal(sala, viajeros);
             }
           };
           tick();
         } else {
-          if (sala.timerId) {
-            clearTimeout(sala.timerId);
-            delete sala.timerId;
+          if (sala.lobbyTimerId) {
+            clearTimeout(sala.lobbyTimerId);
+            delete sala.lobbyTimerId;
           }
           publicarSala(sala);
         }
@@ -415,9 +428,9 @@ wss.on('connection', (socket) => {
       desconectar(sala, asiento.id);
       const viajeros = [...sala.asientos.values()];
       const todosListos = viajeros.length >= 2 && viajeros.every((a) => a.listo);
-      if (!todosListos && sala.timerId) {
-        clearTimeout(sala.timerId);
-        delete sala.timerId;
+      if (!todosListos && sala.lobbyTimerId) {
+        clearTimeout(sala.lobbyTimerId);
+        delete sala.lobbyTimerId;
       }
       publicarSala(sala);
     }

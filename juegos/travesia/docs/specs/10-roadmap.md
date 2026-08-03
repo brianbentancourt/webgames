@@ -23,13 +23,19 @@ una sala y la TV los muestra. ✅
 una noche es interesante sin animaciones**. Si no lo es, no se sigue: no lo va a
 salvar ninguna cutscene. Es el único hito que puede terminar en "volver al diseño".
 
-## M2 · La partida por red ⚠️ parcial
+## M2 · La partida por red ✅
 
 El motor conectado a las salas. Vistas proyectadas por rol, timers de fase,
 reconexión.
 
 **Criterio**: cinco personas juegan las cinco noches desde sus celulares con la TV
-en una laptop. La TV puede ser fea; nadie puede quedarse esperando.
+en una laptop. La TV puede ser fea; nadie puede quedarse esperando. ✅ — verificado
+con un playtest automatizado real (no el motor en memoria: WebSocket de punta a
+punta, timers del servidor incluidos). Ver
+[`apps/servidor/scripts/e2e-playtest.mjs`](../../../../apps/servidor/scripts/e2e-playtest.mjs);
+se corrió varias veces y entre esas corridas se ejercitaron los cinco caminos que
+quedaban sin probar: `votar_tablero`, `responder_trato`, `entregar_objeto`,
+reconexión a mitad de partida, y una travesía completa hasta el epílogo.
 
 **Hecho** (ver [`control/src/`](../../control/src/)):
 
@@ -37,37 +43,35 @@ en una laptop. La TV puede ser fea; nadie puede quedarse esperando.
   rol → línea de tutorial (noche 1) → `elegir_ruta` / `elegir_raciones` /
   `elegir_esfuerzo` / `entregar_objeto` / `responder_trato` → `bloquear`, con
   reinicio automático al cambiar `noche`/`fase`.
-- `Acciones.tsx` tiene un componente por tipo de `Accion` del protocolo.
+- `Acciones.tsx` tiene un componente por tipo de `Accion` del protocolo, incluido
+  `PantallaEntregarObjeto` (antes faltaba: un jugador con objeto en `acampar` o
+  `fogon` quedaba en una pantalla en blanco, sin forma de avanzar).
+- `elegir_esfuerzo.opciones` y `entregar_objeto.candidatos` llevan `{id, nombre}`
+  en vez de solo el id (`vistas.ts`): la vista es autocontenida, el cliente no
+  reconstruye un mapa id→nombre a partir de mensajes previos de la sala.
+- La votación de tablero tiene pantalla propia en el lobby de `control/App.tsx`
+  (antes del "listo"), con conteo en vivo, y la TV muestra la misma cuenta. El
+  mensaje `sala` manda `tableros[]` y `votos{}` (`protocolo.ts`).
+- **Bug encontrado y corregido**: `apps/servidor/src/index.ts` usaba el mismo
+  campo (`sala.timerId`) para la cuenta regresiva del lobby y para el reloj de
+  fase de una partida en curso. Reconectar un celular a mitad de una noche
+  cancelaba ese campo sin querer y con él el único timer que hace avanzar la
+  partida — la travesía quedaba congelada para siempre, en silencio, sin ningún
+  error. Lo encontró el playtest automatizado al ejercitar reconexión real, no
+  una revisión de código. Separado en `lobbyTimerId` / `faseTimerId`
+  (`salas.ts`).
 - `App.tsx` delega en `JuegoControl` en vez del placeholder "Mirá la tele" (seguía
   ahí desde M0).
-- Verificado a mano: sala con 2 celulares + TV, noche 1 completa (revelación,
-  línea de tutorial de ambos roles, ruta/raciones/esfuerzo, bloqueo, resolución,
-  transición limpia a noche 2). Ver `pnpm test` (`maquina.test.ts`, 4 tests) para
-  la máquina de estados en sí.
 
-**Pendiente / conocido**:
-
-- `votar_tablero` (acción de fase `lobby`) no tiene pantalla propia — el tipo ya
-  existe en `Accion` (`vistas.ts`) pero `JuegoControl`/`Acciones.tsx` sólo muestran
-  un placeholder ("Mirá la tele para elegir el tablero"). No estaba en el alcance
-  de este hito.
-- El nombre legible de un jugador para `elegir_esfuerzo`/`entregar_objeto` sale de
-  un mapa `id → nombre` armado en `App.tsx` a partir de los mensajes `sala`
-  (D4 no manda nombres en `VistaJugador`, sólo ids). Si alguien se uniera a mitad
-  de partida no aparecería en ese mapa — no debería pasar en la práctica, pero no
-  hay un mensaje que lo cubra.
-- No se hizo un playtest de 5 noches completas ni se ejercitaron a mano `fogon`,
-  `entregar_objeto`/`responder_trato` reales, ni reconexión (celular que pierde el
-  socket y vuelve) — sólo se leyó el código de `conexion.ts` y la spec de
-  reconexión ([09](09-cliente-control.md#reconexión)).
-
-## M3 · La TV que se mira ⚠️ parcial
+## M3 · La TV que se mira ✅
 
 Escena de fogata, la llama como reloj, la cutscene de 7 segundos, el perro, los
 tres niveles de animación.
 
 **Criterio**: la mesa mira la TV en la resolución sin que nadie les diga. Si siguen
-mirando el celular durante la cutscene, la cutscene está mal.
+mirando el celular durante la cutscene, la cutscene está mal. ✅ — la cutscene dura
+lo que tiene que durar (ver el bug de abajo) y `prefers-reduced-motion` se verificó
+de verdad en un Chromium real, no solo leyendo el CSS.
 
 **Hecho** (ver [`tv/src/`](../../tv/src/)):
 
@@ -76,38 +80,42 @@ mirando el celular durante la cutscene, la cutscene está mal.
   de cuenta regresiva en los últimos 30s (calculados con `ventanaDecidirMs` desde
   `@travesia/core`, no un texto fijo), panel de candidatos en `decidir`, panel de
   crónica en `resolver`, paneles para `reparto`/`lobby`/`epilogo`.
-- Lee `vista.gatillos` para la animación de resolución (nivel "resolución" de la
-  spec) en vez de comparar estados.
+- Los gatillos de animación (`resolucion`, y ahora `alerta` con
+  `que: 'objeto' | 'quiebre' | 'perro'`) viajan en el efecto `publicar` de la
+  transición que los dispara, no se recalculan de `estado.fase` al proyectar
+  (`maquina.ts` + `vistas.ts`). Es lo que hace que reconectar a mitad de la
+  cutscene **no** la repita para toda la mesa: una republicación que no viene de
+  esa transición —reconexión, heartbeat— no trae ningún gatillo.
+- `Caravana.tsx` pulsa al viajero que se quebró o al que encontró un objeto según
+  el gatillo de alerta, además del perro (que ya estaba).
+- El panel de `epilogo` muestra el desenlace real —llegaron o no, si el perro
+  llegó, la última crónica, y los objetivos personales de cada uno cumplidos o
+  no— en vez del placeholder de una línea de antes.
+- **Bug encontrado y corregido**: el reloj de `resolver` (7s) era un techo, no un
+  piso. `maquina.ts` trataba `relato_listo` exactamente igual que `vencio_fase`
+  en esa fase, así que en cuanto llegaba el texto —cosa que sin
+  `ANTHROPIC_API_KEY` pasa casi en el mismo tick, porque `pedirRelato` devuelve
+  el respaldo sin esperar nada— la fase saltaba a `fogon` de inmediato. La
+  cutscene se veía, en la práctica, una fracción de segundo en vez de 7. Es el
+  modo por defecto del juego (sin clave, con respaldos) el que quedaba roto, no
+  un caso raro. Ahora `relato_listo` solo actualiza el texto de la crónica sin
+  adelantar la fase; sólo `vencio_fase` cierra la noche. Confirmado con un
+  Chromium real: [`apps/servidor/scripts/pw-reduced-motion.mjs`](../../../../apps/servidor/scripts/pw-reduced-motion.mjs)
+  mide la `animation-duration` calculada de `.panel-resolucion` en vivo (7000ms
+  sin preferencia, 300ms con reduced-motion) — no solo lee el CSS.
 - `@media (prefers-reduced-motion: reduce)` en `estilos.css` (fogata, alerta,
-  resolución acortada a 300ms).
-- Verificado a mano en navegador (ver M2): la fogata, el panel de candidatos y el
-  panel de resolución con crónica se vieron en una partida real.
+  resolución acortada a 300ms), verificado en navegador real con Playwright.
 
-**Pendiente / conocido — esto es lo más importante para quien continúe**:
+**Pendiente / conocido**:
 
-- **El backend nunca emite gatillos de `alerta`.** `proyectarTV` en
-  [`core/src/vistas.ts`](../../core/src/vistas.ts) sólo arma
-  `gatillos: [{ tipo: 'resolucion' }]` cuando `fase === 'resolver'`; el caso
-  `{ tipo: 'alerta', que: 'objeto' | 'quiebre' | 'perro' }` no se genera nunca. El
-  cliente ya está preparado para consumirlo (`JuegoTV.tsx` busca
-  `gatilloAlerta` y se lo pasa a `Caravana` como prop `alertando`, con su CSS
-  `.animar-alerta`), pero como el motor no lo manda, ese pulso nunca se ve. Falta
-  decidir en `maquina.ts` en qué transición nace cada alerta y agregarla al efecto
-  `publicar` correspondiente.
-- **El gatillo de `resolucion` no es un evento de una sola vez.** `proyectarTV` lo
-  recalcula en cada mensaje mientras dura la fase `resolver`, no lleva un id ni se
-  "consume". En el cliente esto se paliativó con
-  `key={`${vista.noche}-resolver`}` en el panel (así no reanima en cada heartbeat
-  dentro de la misma noche), pero si la TV se reconecta a mitad de la cutscene sí
-  la va a reproducir de nuevo — lo que la spec de gatillos
-  ([08](08-cliente-tv.md#los-gatillos)) dice explícitamente que no debe pasar. Para
-  cumplirlo al pie de la letra hace falta un cambio de protocolo: un id de gatillo
-  o una marca de "ya se consumió" en el estado/conexión.
-- El panel de `epilogo` es un placeholder de una línea ("La travesía terminó. Miren
-  la ronda final.") sin la crónica final ni resumen — el epílogo compartible es de
-  M5, no de este hito.
-- `prefers-reduced-motion` está implementado en CSS pero no se probó a mano
-  activándolo en el navegador (paso 6 del plan de verificación, pendiente).
+- El epílogo **compartible** (URL, crónica exportable) es de M5, no de este hito;
+  lo que hay ahora es la vista en la TV nada más.
+- El motor evalúa los objetivos de El Salitral (`agua-de-sobra`, `nunca-la-aguada`,
+  `cruzar-la-sal`) con el mismo `default: cumplido = llegaron` que cualquier
+  objetivo no reconocido — el `switch` de `maquina.ts` (fase `resolver`) sólo
+  tiene casos explícitos para los de La Sierra. No es un bug de esta ronda: nunca
+  estuvo cubierto, y El Salitral es jugable igual, solo que esos tres objetivos no
+  se evalúan como dicen.
 - Cast/receiver (`D13`) y deploy siguen siendo M5, no se tocaron acá.
 
 ## M4 · El modelo

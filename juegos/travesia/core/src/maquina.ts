@@ -2,6 +2,7 @@ import type { JugadorId, TableroId, TramoId, ObjetoId, ObjetivoId } from './ids.
 import { jugadorId, objetoId } from './ids.js';
 import type { EstadoPartida, NivelRaciones, Viajero, EstadoNoche, Boleta, EntradaCronica, Fase, Vigor, Tramo } from './estado.js';
 import type { Escena, PedidoRelato, ResultadoRelato } from './llm.js';
+import type { Gatillo } from './vistas.js';
 import { VIGOR_MAX, VIGOR_INICIAL, RACIONES, AVANCE, TIEMPOS, ventanaDecidirMs, PERRO_MIENTE } from './config.js';
 import { crearRng } from './rng.js';
 import { REPARTO, type Rol } from './roles.js';
@@ -32,8 +33,16 @@ export type Efecto =
   | { t: 'agendar'; enMs: number }
   /** Pedirle el texto al modelo. Se dispara al empezar la animación (D6). */
   | { t: 'pedir_relato'; pedido: PedidoRelato }
-  /** Reproyectar y mandar vistas. El servidor decide a quién. */
-  | { t: 'publicar'; a: 'todos' | 'tv' | { jugador: JugadorId } }
+  /**
+   * Reproyectar y mandar vistas. El servidor decide a quién.
+   *
+   * `gatillos` viaja solo en el efecto que nace de la transición que lo dispara,
+   * nunca se recalcula de `estado.fase` al proyectar. Si se derivara del estado,
+   * cualquier republicación posterior en la misma fase —un jugador que reconecta
+   * a mitad de la cutscene de resolución, por ejemplo— repetiría la animación
+   * para toda la mesa (08-cliente-tv.md § Los gatillos).
+   */
+  | { t: 'publicar'; a: 'todos' | 'tv' | { jugador: JugadorId }; gatillos?: Gatillo[] }
   | { t: 'terminar' };
 
 export interface Transicion {
@@ -179,8 +188,8 @@ export function reducir(estado: EstadoPartida, comando: Comando): Resultado {
       const viajero = estado.viajeros.find((v) => v.id === comando.jugador);
       if (!viajero) return { ok: false, motivo: 'jugador_desconocido' };
       const nuevosViajeros = estado.viajeros.map((v) =>
-        v.id === comando.jugador ? { ...v, listo: comando.listo } : v
-      ) as any;
+        v.id === comando.jugador ? { ...v, listo: comando.listo } : v,
+      );
       return {
         ok: true,
         transicion: {
@@ -194,7 +203,7 @@ export function reducir(estado: EstadoPartida, comando: Comando): Resultado {
       const n = estado.viajeros.length;
       if (n < 2 || n > 10) return { ok: false, motivo: 'jugada_invalida' };
 
-      const todosListos = estado.viajeros.every((v) => (v as any).listo === true);
+      const todosListos = estado.viajeros.every((v) => v.listo === true);
       if (!todosListos) return { ok: false, motivo: 'jugada_invalida' };
 
       const rng = crearRng(estado.semilla);
@@ -288,13 +297,17 @@ export function reducir(estado: EstadoPartida, comando: Comando): Resultado {
         perro: { presente: true, alerta, dice_la_verdad: diceVerdad },
       };
 
+      // El perro avisa: se para, mira, gruñe. Una noche tranquila no anima nada.
+      const gatillosPerro: Gatillo[] =
+        alerta !== 'ninguna' ? [{ tipo: 'alerta', que: 'perro', duracionMs: TIEMPOS.alertaMs }] : [];
+
       return {
         ok: true,
         transicion: {
           estado: nuevoEstado,
           efectos: [
             { t: 'agendar', enMs: TIEMPOS.acamparMs },
-            { t: 'publicar', a: 'todos' },
+            { t: 'publicar', a: 'todos', gatillos: gatillosPerro },
           ],
         },
       };
@@ -465,18 +478,33 @@ export function reducir(estado: EstadoPartida, comando: Comando): Resultado {
 
   // resolver -> fogon o epilogo
   if (estado.fase === 'resolver') {
-    if (comando.t === 'vencio_fase' || comando.t === 'relato_listo') {
-      // Aplicar el relato si llegó a tiempo
-      let cronica = [...estado.cronica];
-      if (comando.t === 'relato_listo' && cronica.length > 0) {
-        const ultIndex = cronica.length - 1;
-        const ult = cronica[ultIndex]!;
-        cronica[ultIndex] = {
-          ...ult,
-          relato: comando.resultado.texto,
-          origen: comando.resultado.origen,
-        };
-      }
+    // El relato reemplaza el texto de respaldo si llega a tiempo, pero NO
+    // adelanta la fase. Los 7 segundos de `resolver` son un piso, no un techo
+    // (D6): sin API key el modelo "responde" en el mismo tick, y si eso
+    // avanzara la fase, la cutscene se saltearía casi entera cada vez que se
+    // juega sin LLM configurado — que es el modo que el juego promete
+    // sostener entero. Solo `vencio_fase` cierra la noche.
+    if (comando.t === 'relato_listo') {
+      if (estado.cronica.length === 0) return { ok: false, motivo: 'jugada_invalida' };
+      const cronica = [...estado.cronica];
+      const ultIndex = cronica.length - 1;
+      const ult = cronica[ultIndex]!;
+      cronica[ultIndex] = {
+        ...ult,
+        relato: comando.resultado.texto,
+        origen: comando.resultado.origen,
+      };
+      return {
+        ok: true,
+        transicion: {
+          estado: { ...estado, cronica },
+          efectos: [{ t: 'publicar', a: 'tv' }],
+        },
+      };
+    }
+
+    if (comando.t === 'vencio_fase') {
+      const cronica = estado.cronica;
 
       // Evaluar si terminó la partida
       const tablero = obtenerTablero(estado.tablero);
@@ -635,7 +663,12 @@ export function reducir(estado: EstadoPartida, comando: Comando): Resultado {
       };
     }
 
-    if (comando.t === 'vencio_fase' || comando.t === 'relato_listo') {
+    // Solo `vencio_fase`: hoy nada pide relato para la escena `fogon`, así que
+    // `relato_listo` nunca llega acá. Si en el futuro se agrega ese pedido
+    // (07-capa-llm.md § Dónde aparece), que actualice la crónica sin adelantar
+    // la fase — mismo motivo que en `resolver` más arriba — y no que reviva
+    // este patrón.
+    if (comando.t === 'vencio_fase') {
       // Avanzar noche
       const siguienteNoche = estado.noche + 1;
       const rng = crearRng(estado.semilla + '-noche-' + siguienteNoche);
@@ -749,13 +782,16 @@ export function reducir(estado: EstadoPartida, comando: Comando): Resultado {
         ...(tratoOfrecidoA !== undefined ? { tratoOfrecidoA } : {}),
       };
 
+      const gatillosPerro: Gatillo[] =
+        alerta !== 'ninguna' ? [{ tipo: 'alerta', que: 'perro', duracionMs: TIEMPOS.alertaMs }] : [];
+
       return {
         ok: true,
         transicion: {
           estado: nuevoEstado,
           efectos: [
             { t: 'agendar', enMs: TIEMPOS.acamparMs },
-            { t: 'publicar', a: 'todos' },
+            { t: 'publicar', a: 'todos', gatillos: gatillosPerro },
           ],
         },
       };
@@ -963,7 +999,7 @@ function resolverNoche(
     (a, b) => (votosEsfuerzo[b.id] || 0) - (votosEsfuerzo[a.id] || 0)
   );
 
-  const decisionEsfuerzo = ordenados.slice(0, 3).map((v) => v.id);
+  const decisionEsfuerzo = ordenados.slice(0, AVANCE.esfuerzoMax).map((v) => v.id);
 
   // 12 pasos de resolución
   // 1. Se fija la ruta
@@ -1194,6 +1230,17 @@ function resolverNoche(
     fondos: tablero.fondos,
   };
 
+  // Gatillos de esta noche: la resolución siempre anima; objeto y quiebre son
+  // condicionales a lo que efectivamente pasó (los mismos hechos que ya se
+  // registraron arriba, no un chequeo nuevo).
+  const gatillosNoche: Gatillo[] = [{ tipo: 'resolucion', duracionMs: TIEMPOS.resolverMs }];
+  if (hechos.some((h) => h.startsWith('quiebre:'))) {
+    gatillosNoche.push({ tipo: 'alerta', que: 'quiebre', duracionMs: TIEMPOS.alertaMs });
+  }
+  if (hechos.some((h) => h.startsWith('objeto:'))) {
+    gatillosNoche.push({ tipo: 'alerta', que: 'objeto', duracionMs: TIEMPOS.alertaMs });
+  }
+
   return {
     ok: true,
     transicion: {
@@ -1201,7 +1248,7 @@ function resolverNoche(
       efectos: [
         { t: 'pedir_relato', pedido },
         { t: 'agendar', enMs: TIEMPOS.resolverMs },
-        { t: 'publicar', a: 'todos' },
+        { t: 'publicar', a: 'todos', gatillos: gatillosNoche },
       ],
     },
   };
