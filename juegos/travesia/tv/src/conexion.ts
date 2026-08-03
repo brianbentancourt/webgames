@@ -55,5 +55,10 @@ export function useConexion() {
     };
   }, []);
 
-  return { estado, ultimo };
+  const mandar = (mensaje: MensajeEntrante) => {
+    const ws = socket.current;
+    if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(mensaje));
+  };
+
+  return { estado, ultimo, mandar };
 }

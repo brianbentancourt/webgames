@@ -44,18 +44,29 @@ export function App() {
       <ul className="lista">
         {juegos?.map((juego) => (
           <li key={juego.id}>
-            <a
+            <div
               className="tarjeta"
-              href={juego.estado === 'jugable' ? `/${juego.id}` : undefined}
               data-estado={juego.estado}
             >
-              <span className="nombre">{juego.nombre}</span>
-              <span className="resumen">{juego.resumen}</span>
-              <span className="al-pie">
-                {juego.jugadores} · {juego.minutos} min
-                {juego.estado === 'en_obra' && ' · en obra'}
-              </span>
-            </a>
+              <div className="tarjeta-contenido">
+                <span className="nombre">{juego.nombre}</span>
+                <span className="resumen">{juego.resumen}</span>
+                <span className="al-pie">
+                  {juego.jugadores} · {juego.minutos} min
+                  {juego.estado === 'en_obra' && ' · en obra'}
+                </span>
+              </div>
+              {juego.estado === 'jugable' && (
+                <div className="acciones">
+                  <a className="boton-accion" href={`/${juego.id}`}>
+                    Abrir Tablero
+                  </a>
+                  <a className="boton-accion secundario" href={`/${juego.id}/control`}>
+                    Unirse (Celular)
+                  </a>
+                </div>
+              )}
+            </div>
           </li>
         ))}
       </ul>

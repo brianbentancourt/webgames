@@ -36,7 +36,7 @@ export const JUEGOS: readonly FichaJuego[] = [
     resumen: 'Una caravana cruza una sierra en cinco noches. Cada uno sabe algo que los demás no.',
     jugadores: '2 a 10',
     minutos: 25,
-    estado: 'en_obra',
+    estado: 'jugable',
     carpeta: 'travesia',
   },
 ];

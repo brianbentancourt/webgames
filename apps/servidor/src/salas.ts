@@ -8,7 +8,7 @@
 
 import { randomUUID } from 'node:crypto';
 import type { WebSocket } from 'ws';
-import { LIMITES, jugadorId, salaId, type JugadorId, type SalaId } from '@travesia/core';
+import { LIMITES, jugadorId, salaId, type JugadorId, type SalaId, type EstadoPartida } from '@travesia/core';
 
 /** Sin vocales: no salen palabras y no se confunden por teléfono. */
 const ALFABETO = 'BCDFGHJKLMNPQRSTVWXYZ';
@@ -28,6 +28,8 @@ export interface Sala {
   asientos: Map<JugadorId, Asiento>;
   tableroVotado: Map<JugadorId, string>;
   creadaEn: number;
+  partida?: EstadoPartida;
+  timerId?: NodeJS.Timeout;
 }
 
 const salas = new Map<SalaId, Sala>();
@@ -56,7 +58,11 @@ export function obtenerSala(codigo: string): Sala | undefined {
 }
 
 export function cerrarSala(codigo: SalaId): void {
-  salas.delete(codigo);
+  const sala = salas.get(codigo);
+  if (sala) {
+    if (sala.timerId) clearTimeout(sala.timerId);
+    salas.delete(codigo);
+  }
 }
 
 export type ResultadoUnirse =

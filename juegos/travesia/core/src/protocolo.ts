@@ -41,6 +41,7 @@ export const MensajeEntranteSchema = z.discriminatedUnion('t', [
   z.object({ t: z.literal('bloquear') }),
   z.object({ t: z.literal('responder_trato'), acepta: z.boolean() }),
   z.object({ t: z.literal('entregar_objeto'), objeto: z.string(), a: z.string() }),
+  z.object({ t: z.literal('quitar_jugador'), jugador: z.string() }),
   z.object({ t: z.literal('ping') }),
 ]);
 
@@ -53,7 +54,7 @@ export type MensajeEntrante = z.infer<typeof MensajeEntranteSchema>;
 export type MensajeSaliente =
   /** Primer mensaje de toda conexión. Trae el token con el que se reconecta. */
   | { t: 'bienvenida'; version: number; sala: SalaId; jugador?: JugadorId; sesion?: string }
-  | { t: 'sala'; codigo: SalaId; jugadores: { id: JugadorId; nombre: string; listo: boolean }[] }
+  | { t: 'sala'; codigo: SalaId; jugadores: { id: JugadorId; nombre: string; listo: boolean }[]; cuentaRegresiva?: number }
   /** Estado completo. Se manda entero en cada transición: no hay parches (D4). */
   | { t: 'tv'; vista: VistaTV }
   | { t: 'jugador'; vista: VistaJugador }

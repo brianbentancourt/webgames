@@ -27,6 +27,16 @@ body {
   color: var(--tinta);
   font-family: system-ui, -apple-system, sans-serif;
   font-size: 18px;
+  position: relative;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.06'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 9999;
 }
 
 .pantalla {
@@ -55,13 +65,23 @@ input,
 button {
   font: inherit;
   width: 100%;
-  /* 64px de alto: se toca sin mirar y sin errarle. */
   min-height: 64px;
-  border-radius: 14px;
-  border: 1px solid rgba(232, 226, 214, 0.25);
+  border: 2px solid rgba(232, 226, 214, 0.4);
   background: transparent;
   color: var(--tinta);
   padding: 0 18px;
+  /* Efecto papel recortado usando pixeles absolutos en el eje X para no cortar el texto interior en pantallas anchas */
+  border-radius: 0;
+  clip-path: polygon(4px 2%, calc(100% - 4px) 1%, calc(100% - 2px) 98%, 2px 99%);
+  transform: rotate(-0.5deg);
+  /* Sombra dura (box-shadow normal puede cortarse con clip-path si no se maneja bien, usamos drop-shadow en el contenedor o una sombra falsa si hiciera falta. Pero el box-shadow simple suele sobrevivir si el clip-path casi no corta) */
+  box-shadow: 4px 5px 0px rgba(0, 0, 0, 0.4);
+  transition: transform 0.1s steps(2, end), box-shadow 0.1s steps(2, end);
+}
+
+button:active {
+  transform: translate(2px, 3px) rotate(0.5deg);
+  box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.6);
 }
 
 input {
@@ -84,10 +104,76 @@ button:disabled {
 button.secundario {
   background: transparent;
   color: var(--tinta);
-  border: 1px solid rgba(232, 226, 214, 0.25);
+  border: 2px solid rgba(232, 226, 214, 0.4);
 }
 
 .error {
   color: var(--brasa);
   font-size: 15px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Juego en curso                                                      */
+/* ------------------------------------------------------------------ */
+
+.linea-grande {
+  font-size: 32px;
+  line-height: 1.4;
+}
+
+.opciones {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.boton-primario {
+  background: var(--brasa);
+  border: none;
+  color: #16100c;
+  font-weight: 600;
+}
+
+.boton-opcion {
+  background: rgba(0, 0, 0, 0.2);
+  border: 2px solid rgba(232, 226, 214, 0.3);
+  color: var(--tinta);
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 12px 18px;
+}
+
+.boton-opcion.seleccionado {
+  border-color: var(--brasa);
+  color: var(--brasa);
+}
+
+.opcion-nombre {
+  font-weight: 600;
+  font-size: 20px;
+}
+
+.opcion-detalle {
+  font-size: 15px;
+  opacity: 0.7;
+  font-weight: normal;
+}
+
+.resumen-boleta,
+.revelacion {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 20px;
+}
+
+.lista-revelacion {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 20px;
 }

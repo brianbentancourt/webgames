@@ -8,6 +8,7 @@
 
 import { useEffect, useState } from 'react';
 import { useConexion } from './conexion.js';
+import QRCode from 'qrcode';
 
 interface JugadorEnSala {
   id: string;
@@ -15,18 +16,40 @@ interface JugadorEnSala {
   listo: boolean;
 }
 
+import { JuegoTV } from './JuegoTV.js';
+
 export function App() {
-  const { estado, ultimo } = useConexion();
+  const { estado, ultimo, mandar } = useConexion();
   const [codigo, setCodigo] = useState<string | null>(null);
   const [jugadores, setJugadores] = useState<JugadorEnSala[]>([]);
+  const [qrUrl, setQrUrl] = useState<string | null>(null);
+  const [cuentaRegresiva, setCuentaRegresiva] = useState<number | null>(null);
+  const [enJuego, setEnJuego] = useState(false);
+  const [vistaJuego, setVistaJuego] = useState<any>(null);
 
   useEffect(() => {
     if (ultimo === null) return;
     if (ultimo.t === 'sala') {
       setCodigo(ultimo.codigo);
       setJugadores(ultimo.jugadores);
+      setCuentaRegresiva(ultimo.cuentaRegresiva ?? null);
+    }
+    if (ultimo.t === 'tv') {
+      setEnJuego(true);
+      setVistaJuego(ultimo.vista);
     }
   }, [ultimo]);
+
+  useEffect(() => {
+    if (codigo) {
+      const controlUrl = `${window.location.origin}/travesia/control/?sala=${codigo}`;
+      QRCode.toDataURL(controlUrl, { margin: 1, width: 200 })
+        .then(setQrUrl)
+        .catch((err) => console.error('Error al generar QR:', err));
+    } else {
+      setQrUrl(null);
+    }
+  }, [codigo]);
 
   if (estado !== 'abierta') {
     return (
@@ -36,26 +59,52 @@ export function App() {
     );
   }
 
+  if (enJuego && vistaJuego) {
+    return <JuegoTV vista={vistaJuego} />;
+  }
+
   return (
     <main className="pantalla">
-      <section>
-        <p className="al-pie">entrá desde el celular y poné este código</p>
-        <p className="codigo brasa">{codigo ?? '····'}</p>
+      <section style={{ display: 'flex', alignItems: 'center', gap: '3vw' }}>
+        <div>
+          <p className="al-pie">
+            Entrá desde tu celular a: <strong style={{ color: 'var(--tinta)', opacity: 0.9 }}>{window.location.host}/travesia/control</strong> y poné el código o escaneá el QR:
+          </p>
+          <p className="codigo brasa">{codigo ?? '····'}</p>
+        </div>
+        {qrUrl && (
+          <div className="qr-container">
+            <img className="qr-code" src={qrUrl} alt="QR de la sala" />
+          </div>
+        )}
       </section>
 
       <ul className="viajeros">
         {jugadores.map((j) => (
-          <li className="viajero" key={j.id} data-listo={j.listo}>
+          <li className="viajero" key={j.id} data-listo={j.listo} style={{ position: 'relative' }}>
             <span>{j.nombre}</span>
             <span className="al-pie">{j.listo ? 'listo' : 'esperando'}</span>
+            <button
+              className="boton-quitar"
+              onClick={() => mandar({ t: 'quitar_jugador', jugador: j.id })}
+              title="Quitar de la caravana"
+            >
+              ×
+            </button>
           </li>
         ))}
       </ul>
 
       <p className="al-pie">
-        {jugadores.length < 2
-          ? 'faltan viajeros'
-          : `${jugadores.length} en la caravana · la partida empieza cuando estén todos listos`}
+        {cuentaRegresiva !== null ? (
+          <span style={{ fontSize: '2rem', color: 'var(--brasa)', fontWeight: 'bold' }}>
+            iniciando en {cuentaRegresiva} segundos...
+          </span>
+        ) : jugadores.length < 2 ? (
+          'faltan viajeros'
+        ) : (
+          `${jugadores.length} en la caravana · la partida empieza cuando estén todos listos`
+        )}
       </p>
     </main>
   );

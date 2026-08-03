@@ -39,8 +39,11 @@ export function useConexion() {
       };
       ws.onmessage = (ev) => {
         const msg = JSON.parse(ev.data as string) as MensajeSaliente;
-        if (msg.t === 'bienvenida' && msg.sesion !== undefined) {
-          localStorage.setItem(CLAVE_SESION, msg.sesion);
+        if (msg.t === 'bienvenida') {
+          if (msg.sesion !== undefined) {
+            localStorage.setItem(CLAVE_SESION, msg.sesion);
+          }
+          localStorage.setItem('travesia.sala', msg.sala);
         }
         setUltimo(msg);
       };
