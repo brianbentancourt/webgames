@@ -1,20 +1,22 @@
-# Un solo contenedor: sirve los dos clientes y el WebSocket desde el mismo origen.
-# Pensado para caer en una máquina que ya está prendida, al lado de todo lo demás.
+# Un solo contenedor: sirve el menú, los clientes de cada juego y el WebSocket
+# desde el mismo origen. Pensado para caer en una máquina que ya está prendida.
 
 FROM node:22-alpine AS build
 RUN corepack enable
 WORKDIR /app
 
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
-COPY packages/core/package.json packages/core/
-COPY packages/tableros/package.json packages/tableros/
-COPY apps/server/package.json apps/server/
-COPY apps/tv/package.json apps/tv/
-COPY apps/control/package.json apps/control/
+COPY apps/portal/package.json apps/portal/
+COPY apps/servidor/package.json apps/servidor/
+COPY juegos/travesia/core/package.json juegos/travesia/core/
+COPY juegos/travesia/tableros/package.json juegos/travesia/tableros/
+COPY juegos/travesia/tv/package.json juegos/travesia/tv/
+COPY juegos/travesia/control/package.json juegos/travesia/control/
 RUN pnpm install --frozen-lockfile
 
 COPY . .
-RUN pnpm --filter @travesia/tv build && pnpm --filter @travesia/control build
+# Construye el menú y los clientes de todos los juegos.
+RUN pnpm -r build
 
 FROM node:22-alpine
 RUN corepack enable
@@ -24,5 +26,5 @@ ENV NODE_ENV=production PUERTO=8787
 COPY --from=build /app ./
 
 EXPOSE 8787
-# El servidor detecta los `dist` y los monta solo. Ver apps/server/src/estaticos.ts
-CMD ["pnpm", "--filter", "@travesia/server", "start"]
+# El servidor detecta los `dist` y los monta solo. Ver apps/servidor/src/juegos.ts
+CMD ["pnpm", "--filter", "@juegos/servidor", "start"]

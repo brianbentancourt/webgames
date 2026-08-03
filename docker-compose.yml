@@ -1,5 +1,5 @@
 services:
-  travesia:
+  juegos:
     build: .
     restart: unless-stopped
     # Solo escucha en la red local: a internet se sale por el túnel, no por el
@@ -24,4 +24,4 @@ services:
     environment:
       TUNNEL_TOKEN: ${TUNNEL_TOKEN:?falta TUNNEL_TOKEN, ver deploy/cloudflared/README.md}
     depends_on:
-      - travesia
+      - juegos

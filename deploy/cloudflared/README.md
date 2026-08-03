@@ -17,9 +17,9 @@ HTTPS y WSS. **No se abre ningún puerto en el router**: el túnel sale desde ad
 
    | Campo | Valor |
    |---|---|
-   | Subdomain | `travesia` |
+   | Subdomain | `juegos` |
    | Domain | `brianbentancourt.com` |
-   | Service | `HTTP` → `travesia:8787` |
+   | Service | `HTTP` → `juegos:8787` |
 
    El service apunta al **nombre del contenedor**, no a `localhost`: los dos
    contenedores comparten la red de compose.
@@ -31,28 +31,31 @@ HTTPS y WSS. **No se abre ningún puerto en el router**: el túnel sale desde ad
    docker compose up -d --build
    ```
 
-4. Listo: `https://travesia.brianbentancourt.com` es la TV y
-   `https://travesia.brianbentancourt.com/control` es el celular.
+4. Listo:
 
-## Un túnel, varios juegos
+   | URL | Qué es |
+   |---|---|
+   | `https://juegos.brianbentancourt.com` | el menú |
+   | `https://juegos.brianbentancourt.com/travesia` | la TV |
+   | `https://juegos.brianbentancourt.com/travesia/control` | el celular |
 
-El repo va a tener más de un juego. Un mismo túnel soporta varios hostnames
-públicos, así que cada juego se agrega como un Public Hostname más apuntando a su
-propio contenedor:
+## Un juego más
 
-```
-travesia.brianbentancourt.com  → travesia:8787
-<el que venga>.brianbentancourt.com → otro-juego:8788
-```
+**No se toca nada de acá.** Los juegos cuelgan de rutas del mismo hostname, así que
+alcanza con agregar la entrada en `apps/servidor/src/juegos.ts`, la carpeta en
+`/juegos` y reconstruir el contenedor. Mismo túnel, mismo hostname, mismo Public
+Hostname.
 
-No hace falta un túnel por juego ni un servidor por juego.
+Si alguna vez un juego necesita su propio proceso —otro runtime, otra escala— ahí sí
+se agrega un Public Hostname más apuntando a otro contenedor. Hasta entonces no hace
+falta.
 
 ## Lo que hay que saber
 
 **WebSockets**: Cloudflare los proxea sin configuración. El *idle timeout* es de
 ~100 segundos y este juego tiene tres minutos de silencio de red mientras la mesa
 discute, así que el `ping` cada 25 s del protocolo no es opcional. Ya está en
-`packages/core/src/protocolo.ts`.
+`juegos/travesia/core/src/protocolo.ts`.
 
 **Jugando en tu propia casa**, el tráfico sale a Cloudflare y vuelve. Son unos ms y
 no se notan en este juego, pero si molesta, la alternativa es un registro DNS

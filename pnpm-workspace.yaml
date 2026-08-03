@@ -1,3 +1,5 @@
 packages:
+  # Lo común a todos los juegos: el menú y el proceso que sirve todo.
   - 'apps/*'
-  - 'packages/*'
+  # Un juego es una carpeta con todo lo suyo adentro.
+  - 'juegos/*/*'
