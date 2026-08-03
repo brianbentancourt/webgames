@@ -177,3 +177,64 @@ button.secundario {
   gap: 8px;
   font-size: 20px;
 }
+
+/* ------------------------------------------------------------------ */
+/* Ayuda Global (Modal y Botón Flotante)                              */
+/* ------------------------------------------------------------------ */
+
+.boton-ayuda-flotante {
+  position: fixed;
+  top: env(safe-area-inset-top, 16px);
+  right: 16px;
+  width: 48px;
+  min-height: 48px;
+  padding: 0;
+  z-index: 9000;
+  background: var(--tinta);
+  color: #16100c;
+  font-size: 24px;
+  font-weight: bold;
+  border: none;
+  border-radius: 0;
+  clip-path: polygon(8% 5%, 95% 8%, 92% 95%, 5% 92%);
+  box-shadow: 3px 4px 0px rgba(0, 0, 0, 0.4);
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  backdrop-filter: blur(2px);
+}
+
+.modal-contenido {
+  background: var(--fondo);
+  border: 2px solid var(--tinta);
+  padding: 24px;
+  width: 100%;
+  max-width: 400px;
+  clip-path: polygon(2% 1%, 99% 2%, 98% 99%, 1% 98%);
+  transform: rotate(0.5deg);
+  box-shadow: 4px 6px 0px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-lista-ayuda {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  font-size: 16px;
+  line-height: 1.4;
+  opacity: 0.9;
+}
+
+.modal-lista-ayuda strong {
+  color: var(--brasa);
+}

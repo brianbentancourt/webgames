@@ -5,13 +5,20 @@
  * esfuerzo entran cuando el servidor mande vistas `jugador`
  * (ver docs/specs/09-cliente-control.md).
  */
+/**
+ * El celular. Una acción por pantalla, nunca dos.
+ *
+ * ESTADO: entrar a la sala y marcarse listo. Las pantallas de ruta, raciones y
+ * esfuerzo entran cuando el servidor mande vistas `jugador`
+ * (ver docs/specs/09-cliente-control.md).
+ */
 
 import { useEffect, useState } from 'react';
 import type { VistaJugador } from '@travesia/core';
 import { useConexion } from './conexion.js';
 import { JuegoControl } from './JuegoControl.js';
 
-export function App() {
+function ContenidoApp() {
   const { estado, ultimo, mandar } = useConexion();
   const [codigo, setCodigo] = useState('');
   const [nombre, setNombre] = useState('');
@@ -142,5 +149,40 @@ export function App() {
         </button>
       )}
     </main>
+  );
+}
+
+export function App() {
+  const [mostrandoAyuda, setMostrandoAyuda] = useState(false);
+
+  return (
+    <>
+      <ContenidoApp />
+      
+      <button 
+        className="boton-ayuda-flotante" 
+        onClick={() => setMostrandoAyuda(true)}
+        aria-label="Ayuda"
+      >
+        ?
+      </button>
+
+      {mostrandoAyuda && (
+        <div className="modal-overlay" onClick={() => setMostrandoAyuda(false)}>
+          <div className="modal-contenido" onClick={(e) => e.stopPropagation()}>
+            <h2 className="linea" style={{ color: 'var(--brasa)', marginBottom: '16px' }}>La Travesía</h2>
+            <ul className="modal-lista-ayuda">
+              <li><strong>Objetivo:</strong> Cruzar la sierra en 5 noches sobreviviendo como grupo.</li>
+              <li><strong>Mecánica:</strong> En cada ronda dialogan y alguien elige una ruta (cuesta raciones y esfuerzo).</li>
+              <li><strong>Secreto:</strong> Tienes un estado físico (hambre, vigor) y un objetivo que nadie ve.</li>
+              <li><strong>Cuidado:</strong> Los tratos pueden ser engañosos. No confíes ciegamente.</li>
+            </ul>
+            <button style={{ marginTop: '24px' }} onClick={() => setMostrandoAyuda(false)}>
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
