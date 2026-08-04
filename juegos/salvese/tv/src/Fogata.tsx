@@ -22,9 +22,21 @@ export function Fogata({
           opacity
         }}
       />
-      <div className="flama-base brasa-anim" />
-      <div className="flama-medio brasa-anim" />
-      <div className="flama-centro brasa-anim" />
+      <div
+        className="flamas-wrapper"
+        style={{
+          position: 'absolute',
+          inset: 0,
+          transform: `scale(${scale})`,
+          transformOrigin: '50% 50%',
+          transition: 'transform 0.8s steps(4, end)'
+        }}
+      >
+        <div className="flama-base brasa-anim" />
+        <div className="flama-medio brasa-anim" />
+        <div className="flama-centro brasa-anim" />
+        <div className="chispas-fogata" />
+      </div>
       {mostrarDigitos && segundos !== undefined && segundos > 0 && (
         <div className="fogata-digitos">{segundos}</div>
       )}

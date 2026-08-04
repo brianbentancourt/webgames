@@ -38,10 +38,20 @@ export function JuegoTV({ vista }: { vista: VistaTV }) {
         todavía, `background-image` no carga nada y quedan visibles las capas
         de degradé de arriba — no hace falta lógica de respaldo aparte.
       */}
+      <div className="capa-estrellas" />
       <div
         className="fondo-ilustrado"
         style={{
           backgroundImage: `linear-gradient(to bottom, rgba(0,0,0,.4), rgba(0,0,0,.1) 35%, rgba(0,0,0,.6)), url("${import.meta.env.BASE_URL}fondos/${vista.tablero.fondo}.jpg")`,
+        }}
+      />
+      
+      <div className="textura-papel" />
+      <div 
+        className="vignette-fuego" 
+        style={{
+          /* A menor reloj, menor luz, por lo tanto la viñeta (oscuridad) cubre más */
+          background: `radial-gradient(circle at 50% 80%, transparent ${30 + vista.reloj * 20}%, rgba(0,0,0,${0.9 - vista.reloj * 0.4}) 100%)`,
         }}
       />
 

@@ -25,7 +25,9 @@ export function Caravana({ viajeros, perro, alertaQue }: Props) {
             key={v.id}
             className={`silueta-viajero estado-${v.aspecto} ${v.bloqueo === 'listo' ? 'bloqueado' : ''} ${animar ? 'animar-alerta' : ''}`}
           >
+            <div className="sombra-suelo" />
             <div className="silueta-avatar-sombra">
+              <div className="silueta-cabeza" />
               <div className="silueta-avatar" />
             </div>
             <div className="silueta-info">
@@ -39,8 +41,12 @@ export function Caravana({ viajeros, perro, alertaQue }: Props) {
 
       {perro.presente && (
         <div className={`silueta-perro alerta-${perro.alerta} ${alertaQue === 'perro' ? 'animar-alerta' : ''}`}>
-          <div className="silueta-avatar-sombra">
-            <div className="silueta-avatar-perro" />
+          <div className="sombra-suelo sombra-suelo-perro" />
+          <div className="silueta-avatar-sombra silueta-avatar-sombra-perro">
+            <div className="silueta-perro-figura">
+              <div className="silueta-perro-cuerpo" />
+              <div className="silueta-perro-cabeza" />
+            </div>
           </div>
           <span className="silueta-nombre">Perro</span>
         </div>

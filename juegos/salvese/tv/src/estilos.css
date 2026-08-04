@@ -181,6 +181,20 @@ body::before {
   background-position: center;
 }
 
+.vignette-fuego {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  animation: titileo-vignette 0.5s infinite alternate;
+  z-index: 1;
+}
+
+@keyframes titileo-vignette {
+  0% { transform: scale(1); opacity: 0.95; }
+  50% { transform: scale(1.02); opacity: 1; }
+  100% { transform: scale(0.98); opacity: 0.9; }
+}
+
 .ui-superior {
   position: relative;
   padding: var(--overscan) calc(var(--overscan) * 1.2) 0;
@@ -239,68 +253,140 @@ body::before {
 }
 
 .estado-quebrado .silueta-avatar-sombra {
-  transform: rotate(90deg) translateY(2vh) translateX(1vh);
+  animation: caida-quebrado 0.5s steps(4, end) forwards;
 }
 
-.silueta-avatar,
-.silueta-avatar-perro {
-  width: 5vh;
-  height: 8vh;
+@keyframes caida-quebrado {
+  0% { transform: rotate(0) translateY(0); opacity: 1; }
+  50% { transform: rotate(45deg) translateY(1vh); opacity: 0.8; }
+  100% { transform: rotate(90deg) translateY(2vh) translateX(1vh); opacity: 0.5; }
+}
+
+/* Cada viajero es una cabeza + un cuerpo, no un solo trapecio: así se lee
+   "una persona parada" de reojo, que es el punto de un teatro de sombras. */
+.silueta-cabeza {
+  width: 2.5vh;
+  height: 2.5vh;
+  margin-bottom: -0.5vh;
+  border-radius: 50%;
+  background-image:
+    radial-gradient(circle at 35% 25%, rgba(255, 255, 255, 0.5), transparent 55%),
+    linear-gradient(150deg, color-mix(in srgb, var(--color-viajero, #c2b59e) 100%, white 20%) 0%, var(--color-viajero, #c2b59e) 50%, color-mix(in srgb, var(--color-viajero, #c2b59e) 100%, black 30%) 100%);
+  position: relative;
+  z-index: 1;
+}
+
+.silueta-avatar {
+  width: 5.4vh;
+  height: 6.6vh;
   /* Faceta de papel: un brillo suave arriba a la izquierda donde pegaría la
-     luz, oscureciendo hacia abajo a la derecha — no un color plano. */
+     luz, oscureciendo hacia abajo a la derecha — no un color plano. Cuerpo con
+     hombros angostos y ruedo de capa ancho: se lee como una figura con capa,
+     no como un cuadrilátero cualquiera. */
   background-image:
-    radial-gradient(circle at 30% 18%, rgba(255, 255, 255, 0.4), transparent 55%),
-    linear-gradient(150deg, color-mix(in srgb, #c2b59e 100%, white 15%) 0%, #c2b59e 45%, color-mix(in srgb, #c2b59e 100%, black 25%) 100%);
-  clip-path: polygon(15% 5%, 85% 8%, 95% 95%, 5% 98%);
-  transform: rotate(-2deg);
+    radial-gradient(circle at 30% 15%, rgba(255, 255, 255, 0.35), transparent 50%),
+    linear-gradient(150deg, color-mix(in srgb, var(--color-viajero, #c2b59e) 100%, white 15%) 0%, var(--color-viajero, #c2b59e) 45%, color-mix(in srgb, var(--color-viajero, #c2b59e) 100%, black 25%) 100%);
+  clip-path: polygon(38% 0%, 62% 0%, 78% 14%, 90% 58%, 100% 100%, 0% 100%, 10% 58%, 22% 14%);
 }
 
-/* Darle personalidad y colores a los recortes según el índice */
-.silueta-viajero:nth-child(1) .silueta-avatar {
-  background-image:
-    radial-gradient(circle at 30% 18%, rgba(255, 255, 255, 0.4), transparent 55%),
-    linear-gradient(150deg, color-mix(in srgb, #5a7b8c 100%, white 20%) 0%, #5a7b8c 45%, color-mix(in srgb, #5a7b8c 100%, black 30%) 100%);
-  clip-path: polygon(10% 5%, 85% 15%, 90% 90%, 15% 100%);
+/* Un color por viajero, cíclico cada 6 (jugadoresMax es 10). Antes esto
+   duplicaba el degradé y el recorte entero por cada índice; ahora solo fija
+   un color y la forma se comparte. */
+.silueta-viajero:nth-child(6n + 1) {
+  --color-viajero: #5a7b8c;
 }
-.silueta-viajero:nth-child(2) .silueta-avatar {
-  background-image:
-    radial-gradient(circle at 30% 18%, rgba(255, 255, 255, 0.4), transparent 55%),
-    linear-gradient(150deg, color-mix(in srgb, #8c5a5a 100%, white 20%) 0%, #8c5a5a 45%, color-mix(in srgb, #8c5a5a 100%, black 30%) 100%);
-  clip-path: polygon(20% 0%, 90% 5%, 95% 95%, 5% 95%);
+.silueta-viajero:nth-child(6n + 2) {
+  --color-viajero: #8c5a5a;
 }
-.silueta-viajero:nth-child(3) .silueta-avatar {
-  background-image:
-    radial-gradient(circle at 30% 18%, rgba(255, 255, 255, 0.4), transparent 55%),
-    linear-gradient(150deg, color-mix(in srgb, #5a8c6b 100%, white 20%) 0%, #5a8c6b 45%, color-mix(in srgb, #5a8c6b 100%, black 30%) 100%);
-  clip-path: polygon(15% 10%, 85% 5%, 100% 100%, 0% 100%);
+.silueta-viajero:nth-child(6n + 3) {
+  --color-viajero: #5a8c6b;
 }
-.silueta-viajero:nth-child(4) .silueta-avatar {
-  background-image:
-    radial-gradient(circle at 30% 18%, rgba(255, 255, 255, 0.4), transparent 55%),
-    linear-gradient(150deg, color-mix(in srgb, #826a8c 100%, white 20%) 0%, #826a8c 45%, color-mix(in srgb, #826a8c 100%, black 30%) 100%);
-  clip-path: polygon(5% 5%, 95% 10%, 85% 95%, 10% 90%);
+.silueta-viajero:nth-child(6n + 4) {
+  --color-viajero: #826a8c;
 }
-.silueta-viajero:nth-child(5) .silueta-avatar {
-  background-image:
-    radial-gradient(circle at 30% 18%, rgba(255, 255, 255, 0.4), transparent 55%),
-    linear-gradient(150deg, color-mix(in srgb, #8c7c5a 100%, white 20%) 0%, #8c7c5a 45%, color-mix(in srgb, #8c7c5a 100%, black 30%) 100%);
-  clip-path: polygon(12% 0%, 88% 5%, 96% 92%, 8% 98%);
+.silueta-viajero:nth-child(6n + 5) {
+  --color-viajero: #8c7c5a;
 }
-.silueta-viajero:nth-child(6) .silueta-avatar {
-  background-image:
-    radial-gradient(circle at 30% 18%, rgba(255, 255, 255, 0.4), transparent 55%),
-    linear-gradient(150deg, color-mix(in srgb, #5a5a8c 100%, white 20%) 0%, #5a5a8c 45%, color-mix(in srgb, #5a5a8c 100%, black 30%) 100%);
-  clip-path: polygon(10% 8%, 90% 2%, 92% 98%, 5% 90%);
+.silueta-viajero:nth-child(6n) {
+  --color-viajero: #5a5a8c;
 }
 
-.silueta-avatar-perro {
-  width: 4vh;
-  height: 4vh;
+/* El perro: cuerpo bajo y ovalado + cabeza adelantada con una oreja, de
+   costado — antes era un solo cuadrilátero achatado, ilegible como animal. */
+.silueta-avatar-sombra-perro {
+  flex-direction: row;
+  align-items: flex-end;
+}
+
+.silueta-perro-figura {
+  display: flex;
+  align-items: flex-end;
+}
+
+.silueta-perro-cuerpo {
+  width: 4.2vh;
+  height: 2.4vh;
+  border-radius: 55% 45% 40% 35% / 75% 75% 45% 45%;
   background-image:
-    radial-gradient(circle at 30% 18%, rgba(255, 255, 255, 0.35), transparent 55%),
+    radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.35), transparent 55%),
     linear-gradient(150deg, color-mix(in srgb, #a38965 100%, white 20%) 0%, #a38965 45%, color-mix(in srgb, #a38965 100%, black 30%) 100%);
-  clip-path: polygon(10% 10%, 85% 5%, 95% 85%, 5% 90%);
-  transform: rotate(3deg);
+  position: relative;
+}
+
+/* Cola del perro */
+.silueta-perro-cuerpo::before {
+  content: '';
+  position: absolute;
+  top: 0.2vh;
+  left: -0.6vh;
+  width: 1.4vh;
+  height: 0.6vh;
+  background: color-mix(in srgb, #a38965 100%, black 30%);
+  border-radius: 50% 10% 10% 50%;
+  transform-origin: right center;
+  transform: rotate(45deg);
+  animation: mover-cola 0.4s steps(3, end) infinite alternate;
+}
+
+@keyframes mover-cola {
+  0% { transform: rotate(20deg); }
+  100% { transform: rotate(70deg); }
+}
+
+/* Patas del perro */
+.silueta-perro-cuerpo::after {
+  content: '';
+  position: absolute;
+  bottom: -0.6vh;
+  left: 0.6vh;
+  width: 0.6vh;
+  height: 1.2vh;
+  background: color-mix(in srgb, #a38965 100%, black 40%);
+  border-radius: 0 0 0.3vh 0.3vh;
+  box-shadow: 2vh 0 0 color-mix(in srgb, #a38965 100%, black 20%);
+}
+
+.silueta-perro-cabeza {
+  width: 1.9vh;
+  height: 1.9vh;
+  margin-left: -0.5vh;
+  margin-bottom: 0.3vh;
+  border-radius: 50%;
+  position: relative;
+  background-image:
+    radial-gradient(circle at 35% 25%, rgba(255, 255, 255, 0.35), transparent 55%),
+    linear-gradient(150deg, color-mix(in srgb, #a38965 100%, white 20%) 0%, #a38965 45%, color-mix(in srgb, #a38965 100%, black 30%) 100%);
+}
+
+.silueta-perro-cabeza::after {
+  content: '';
+  position: absolute;
+  top: -0.6vh;
+  right: 0.1vh;
+  width: 0.7vh;
+  height: 1vh;
+  clip-path: polygon(50% 0%, 100% 100%, 10% 100%);
+  background: color-mix(in srgb, #a38965 100%, black 30%);
 }
 
 .estado-quebrado {
@@ -529,11 +615,6 @@ body::before {
     background: rgba(0, 0, 0, 0.55);
     opacity: 1;
   }
-  100% {
-    background: rgba(0, 0, 0, 0);
-    opacity: 1;
-  }
-}
 
 .cronica-texto {
   font-size: 3vh;
@@ -547,7 +628,18 @@ body::before {
   }
 
   .alerta-alerta,
-  .animar-alerta {
+  .animar-alerta,
+  .silueta-perro-cuerpo::before,
+  .estado-sano .silueta-avatar,
+  .estado-sano .silueta-cabeza,
+  .estado-al_limite .silueta-avatar,
+  .estado-al_limite .silueta-cabeza,
+  .estado-cansado .silueta-avatar,
+  .estado-cansado .silueta-cabeza,
+  .silueta-perro-cuerpo,
+  .chispas-fogata,
+  .chispas-fogata::after,
+  .capa-estrellas {
     animation: none;
   }
 
@@ -600,4 +692,105 @@ body::before {
 .boton-quitar:hover {
   transform: scale(1.15);
   background: #ff1a1a;
+}
+
+/* Efecto grano de papel para toda la pantalla */
+.textura-papel {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+  opacity: 0.15;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+}
+
+/* Cielo estrellado */
+.capa-estrellas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 50%;
+  pointer-events: none;
+  z-index: 0;
+  background-image: 
+    radial-gradient(1px 1px at 10% 20%, white, transparent),
+    radial-gradient(1px 1px at 25% 10%, rgba(255,255,255,0.8), transparent),
+    radial-gradient(1.5px 1.5px at 40% 30%, white, transparent),
+    radial-gradient(2px 2px at 60% 15%, rgba(255,255,255,0.9), transparent),
+    radial-gradient(1px 1px at 75% 25%, white, transparent),
+    radial-gradient(1.5px 1.5px at 90% 10%, rgba(255,255,255,0.7), transparent);
+  animation: titileo-estrellas 4s steps(4, end) infinite alternate;
+}
+
+@keyframes titileo-estrellas {
+  0% { opacity: 0.5; }
+  100% { opacity: 1; }
+}
+
+/* Chispas volando de la fogata */
+.chispas-fogata {
+  position: absolute;
+  bottom: 4vh;
+  left: 50%;
+  width: 1vh;
+  height: 1vh;
+  background: var(--brasa);
+  border-radius: 50%;
+  animation: chispas-vuelan 2s steps(8, end) infinite;
+}
+.chispas-fogata::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 2vh;
+  width: 0.8vh;
+  height: 0.8vh;
+  background: #ffb066;
+  border-radius: 50%;
+  animation: chispas-vuelan 1.5s steps(6, end) infinite 0.5s;
+}
+
+@keyframes chispas-vuelan {
+  0% { transform: translateY(0) translateX(0) scale(1); opacity: 1; }
+  50% { transform: translateY(-4vh) translateX(1.5vh) scale(0.8); opacity: 0.8; }
+  100% { transform: translateY(-8vh) translateX(-1.5vh) scale(0); opacity: 0; }
+}
+
+/* Respiración de personajes */
+.estado-sano .silueta-avatar,
+.estado-sano .silueta-cabeza,
+.estado-al_limite .silueta-avatar,
+.estado-al_limite .silueta-cabeza,
+.estado-cansado .silueta-avatar,
+.estado-cansado .silueta-cabeza {
+  animation: respiracion 2.5s steps(4, end) infinite alternate;
+}
+.silueta-perro-cuerpo {
+  animation: respiracion 2s steps(4, end) infinite alternate;
+}
+
+@keyframes respiracion {
+  0% { transform: scaleY(1); }
+  100% { transform: scaleY(1.04) translateY(-0.1vh); }
+}
+
+/* Sombras proyectadas en el suelo */
+.sombra-suelo {
+  position: absolute;
+  bottom: -0.8vh;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 5vh;
+  height: 1.5vh;
+  background: rgba(0, 0, 0, 0.45);
+  border-radius: 50%;
+  filter: blur(1.5px);
+  z-index: 0;
+}
+.sombra-suelo-perro {
+  width: 4vh;
+  height: 1vh;
+  bottom: -0.4vh;
 }
