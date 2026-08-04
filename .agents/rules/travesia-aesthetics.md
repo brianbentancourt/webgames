@@ -1,6 +1,6 @@
-# Estética Visual: "Paper Cutout" y Stop-Motion (La Travesía)
+# Estética Visual: "Paper Cutout" y Stop-Motion (Sálvese quien pueda!)
 
-Cuando diseñes o modifiques interfaces (UI) para el juego "La Travesía" (`juegos/travesia`), debes apegarte estrictamente al siguiente estilo visual. Esto se aplica tanto a la pantalla principal de TV (`/tv`) como al control de celular (`/control`).
+Cuando diseñes o modifiques interfaces (UI) para el juego "Sálvese quien pueda!" (`juegos/salvese`), debes apegarte estrictamente al siguiente estilo visual. Esto se aplica tanto a la pantalla principal de TV (`/tv`) como al control de celular (`/control`).
 
 ## 1. Textura y Materialidad (Papel/Cartulina)
 El mundo del juego y la interfaz están hechos de papel rústico, cartón o cartulina.

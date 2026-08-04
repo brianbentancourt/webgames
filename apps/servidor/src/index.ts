@@ -23,8 +23,8 @@ import {
   VIGOR_INICIAL,
   jugadorId,
   type JugadorId,
-} from '@travesia/core';
-import { TABLEROS, validarTableros } from '@travesia/tableros';
+} from '@salvese/core';
+import { TABLEROS, validarTableros } from '@salvese/tableros';
 import { config } from './config.js';
 import { crearEstaticos } from './estaticos.js';
 import { JUEGOS, montajes } from './juegos.js';
@@ -35,7 +35,7 @@ import { pedirRelato } from './llm/adaptador.js';
 validarTableros();
 // El motor de reglas no conoce los tableros por su cuenta: se los damos acá,
 // una sola vez, al arrancar. Antes esto pasaba como side-effect de importar
-// @travesia/tableros, que hacía que "quién registra qué" dependiera del orden
+// @salvese/tableros, que hacía que "quién registra qué" dependiera del orden
 // de imports en vez de estar escrito en un solo lugar.
 for (const tablero of TABLEROS) {
   registrarTablero(tablero.id, tablero as unknown as TableroDato);

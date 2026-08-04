@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b1020" />
+    <link rel="icon" href="/icon.jpg" type="image/jpeg" />
+    <title>Sálvese Quien Pueda</title>
+  </head>
+  <body>
+    <div id="raiz"></div>
+    <script type="text/javascript">
+      window['__onGCastApiAvailable'] = function(isAvailable) {
+        if (isAvailable) {
+          cast.framework.CastContext.getInstance().setOptions({
+            receiverApplicationId: 'F22A8EF2',
+            autoJoinPolicy: chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED
+          });
+        }
+      };
+    </script>
+    <script type="text/javascript" src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1"></script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

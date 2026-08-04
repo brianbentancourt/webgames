@@ -8,7 +8,7 @@
 
 import { randomUUID } from 'node:crypto';
 import type { WebSocket } from 'ws';
-import { LIMITES, jugadorId, salaId, type JugadorId, type SalaId, type EstadoPartida } from '@travesia/core';
+import { LIMITES, jugadorId, salaId, type JugadorId, type SalaId, type EstadoPartida } from '@salvese/core';
 
 /** Sin vocales: no salen palabras y no se confunden por teléfono. */
 const ALFABETO = 'BCDFGHJKLMNPQRSTVWXYZ';
@@ -35,7 +35,7 @@ export interface Sala {
    * Reloj de la fase en curso, una vez que existe `partida` (viene de un
    * efecto `agendar` del motor). Campo separado a propósito: si compartiera
    * el mismo timer que el lobby, un jugador reconectando a mitad de una noche
-   * cancelaría el único reloj que hace avanzar la partida y la travesía
+   * cancelaría el único reloj que hace avanzar la partida y Sálvese quien pueda!
    * quedaría congelada para siempre sin que nadie lo note.
    */
   faseTimerId?: NodeJS.Timeout;

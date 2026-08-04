@@ -8,7 +8,8 @@ services:
       - '8787:8787'
     environment:
       # Sin clave el juego corre entero con los textos de respaldo de cada tablero.
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      MODELO: ${MODELO:-}
     healthcheck:
       test: ['CMD', 'wget', '-qO-', 'http://localhost:8787/salud']
       interval: 30s

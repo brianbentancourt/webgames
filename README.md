@@ -11,7 +11,7 @@ su ruta.
 
 | Juego | Jugadores | Dura | Estado |
 |---|---|---|---|
-| [La Travesía](juegos/travesia/) — una caravana cruza una sierra en cinco noches | 2 a 10 | 25 min | jugable (sin voz de IA todavía) |
+| [Sálvese quien pueda!](juegos/salvese/) — una caravana cruza una sierra en cinco noches | 2 a 10 | 25 min | jugable (sin voz de IA todavía) |
 
 ## Estructura
 
@@ -20,7 +20,7 @@ su ruta.
   /portal      el menú — lista los juegos, no sabe nada de ninguno
   /servidor    proceso único: salas, WebSocket y sirve todos los estáticos
 /juegos
-  /travesia    un juego es una carpeta con todo lo suyo adentro
+  /salvese    un juego es una carpeta con todo lo suyo adentro
     /core        tipos y reglas, sin dependencias de framework
     /tableros    escenarios como datos
     /tv          cliente de TV

@@ -1,4 +1,4 @@
-# UX y Textos: "Aprender sobre la marcha" (La Travesía)
+# UX y Textos: "Aprender sobre la marcha" (Sálvese quien pueda!)
 
 Cuando diseñes componentes, agregues acciones o modifiques la UI del cliente (especialmente `/control`), tené presente la siguiente filosofía de diseño UX para el juego:
 

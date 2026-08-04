@@ -167,8 +167,8 @@ por la mitad sin dar ningún error visible.
 Un juego es una carpeta en `/juegos` con todo lo suyo adentro: reglas, datos, sus dos
 clientes y sus docs. Lo común —el menú y el proceso que sirve todo— vive en `/apps`.
 
-**Descartado agrupar por tipo** (`/apps/travesia-tv`, `/apps/otrojuego-tv`,
-`/packages/travesia-core`…): con cuatro juegos son doce carpetas hermanas y hay que
+**Descartado agrupar por tipo** (`/apps/salvese-tv`, `/apps/otrojuego-tv`,
+`/packages/salvese-core`…): con cuatro juegos son doce carpetas hermanas y hay que
 leer el prefijo para saber qué va con qué. Agrupar por juego hace que agregar uno sea
 agregar una carpeta, y que borrarlo sea borrarla.
 
@@ -178,5 +178,5 @@ compartida hoy es el registro de `apps/servidor/src/juegos.ts`, que es una lista
 que resulte común va a ser evidente recién con el segundo juego funcionando.
 
 **Un solo proceso y un solo hostname**, con los juegos colgando de rutas
-(`/travesia`, `/travesia/control`). Un juego más no es infraestructura más. Si alguna
+(`/salvese`, `/salvese/control`). Un juego más no es infraestructura más. Si alguna
 vez uno necesita su propio proceso —otro runtime, otra escala— ahí se le da el suyo.

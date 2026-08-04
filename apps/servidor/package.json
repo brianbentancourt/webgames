@@ -10,8 +10,8 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@travesia/core": "workspace:*",
-    "@travesia/tableros": "workspace:*",
+    "@salvese/core": "workspace:*",
+    "@salvese/tableros": "workspace:*",
     "ws": "^8.18.0",
     "zod": "^3.24.1"
   },

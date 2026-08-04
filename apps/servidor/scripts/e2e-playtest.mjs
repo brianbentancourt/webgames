@@ -129,7 +129,7 @@ class Jugador {
     }
 
     // Boleta normal: ruta + raciones ajustadas (para forzar hambre/quiebre en
-    // algún momento de la travesía) + a mí mismo al esfuerzo, y bloquear.
+    // algún momento de Sálvese quien pueda!) + a mí mismo al esfuerzo, y bloquear.
     const accionRuta = v.acciones.find((a) => a.tipo === 'elegir_ruta');
     const accionEsfuerzo = v.acciones.find((a) => a.tipo === 'elegir_esfuerzo');
     if (accionRuta) {
@@ -148,7 +148,7 @@ class Jugador {
 }
 
 async function main() {
-  console.log('=== PLAYTEST E2E: La Travesía ===');
+  console.log('=== PLAYTEST E2E: Sálvese quien pueda! ===');
 
   const tv = conectar();
   await new Promise((resolve) => tv.on('open', resolve));

@@ -45,12 +45,12 @@ importers:
 
   apps/servidor:
     dependencies:
-      '@travesia/core':
+      '@salvese/core':
         specifier: workspace:*
-        version: link:../../juegos/travesia/core
-      '@travesia/tableros':
+        version: link:../../juegos/salvese/core
+      '@salvese/tableros':
         specifier: workspace:*
-        version: link:../../juegos/travesia/tableros
+        version: link:../../juegos/salvese/tableros
       ws:
         specifier: ^8.18.0
         version: 8.21.1
@@ -65,9 +65,9 @@ importers:
         specifier: ^4.19.2
         version: 4.23.5
 
-  juegos/travesia/control:
+  juegos/salvese/control:
     dependencies:
-      '@travesia/core':
+      '@salvese/core':
         specifier: workspace:*
         version: link:../core
       react:
@@ -90,24 +90,24 @@ importers:
         specifier: ^6.0.5
         version: 6.4.3(@types/node@22.20.1)(tsx@4.23.5)
 
-  juegos/travesia/core:
+  juegos/salvese/core:
     dependencies:
       zod:
         specifier: ^3.24.1
         version: 3.25.76
 
-  juegos/travesia/tableros:
+  juegos/salvese/tableros:
     dependencies:
       zod:
         specifier: ^3.24.1
         version: 3.25.76
 
-  juegos/travesia/tv:
+  juegos/salvese/tv:
     dependencies:
-      '@travesia/core':
+      '@salvese/core':
         specifier: workspace:*
         version: link:../core
-      '@travesia/tableros':
+      '@salvese/tableros':
         specifier: workspace:*
         version: link:../tableros
       qrcode:

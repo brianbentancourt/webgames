@@ -18,7 +18,7 @@ import WebSocket from 'ws';
 
 const PUERTO = process.env.PUERTO ?? '8787';
 const WS_URL = `ws://localhost:${PUERTO}/ws`;
-const HTTP_URL = `http://localhost:${PUERTO}/travesia`;
+const HTTP_URL = `http://localhost:${PUERTO}/salvese`;
 const CHROMIUM_PATH = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 
 function esperarMensaje(ws, filtro, msTimeout = 15000) {

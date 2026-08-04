@@ -12,8 +12,8 @@ en un subdominio propio. Los pasos concretos están en
 
 ```
 juegos.brianbentancourt.com/                  → el menú
-juegos.brianbentancourt.com/travesia          → la TV
-juegos.brianbentancourt.com/travesia/control  → el celular
+juegos.brianbentancourt.com/salvese          → la TV
+juegos.brianbentancourt.com/salvese/control  → el celular
 juegos.brianbentancourt.com/api/juegos        → la lista que pinta el menú
 juegos.brianbentancourt.com/ws                → el WebSocket
 ```
@@ -72,8 +72,8 @@ proceso, un solo dominio, un solo deploy.
 
 ```
 /                    → apps/portal/dist
-/travesia            → juegos/travesia/tv/dist
-/travesia/control    → juegos/travesia/control/dist
+/salvese            → juegos/salvese/tv/dist
+/salvese/control    → juegos/salvese/control/dist
 /ws                  → el WebSocket
 ```
 
@@ -94,14 +94,14 @@ esperando frente a la tele.
 
 ### 3 · Estáticos aparte, cuando haya tráfico
 
-`juegos/travesia/tv` y `juegos/travesia/control` a Cloudflare Pages o Netlify (gratis, CDN), el servidor
+`juegos/salvese/tv` y `juegos/salvese/control` a Cloudflare Pages o Netlify (gratis, CDN), el servidor
 donde esté. Ahí sí aparecen CORS y una `VITE_SERVIDOR` apuntando a otro host, y
 `tv` y `control` pasan a poder quedar desincronizados del servidor entre deploys.
 Vale la pena recién cuando el CDN compre algo.
 
 ## Gratis, en serio
 
-`juegos/travesia/tv` y `juegos/travesia/control` son estáticos: Cloudflare Pages, Netlify o Vercel los
+`juegos/salvese/tv` y `juegos/salvese/control` son estáticos: Cloudflare Pages, Netlify o Vercel los
 hostean gratis para siempre y ninguno es la parte difícil. **Lo único que cuesta es
 el proceso vivo.**
 
@@ -143,7 +143,7 @@ mandar nada — que es exactamente lo que hace este juego mientras la mesa discu
 
 El costo es un rewrite de `apps/servidor`: hoy son unas 250 líneas contra `node:http`
 y `ws`, y habría que pasarlas al runtime de Workers (`fetch` + `WebSocketPair`).
-`juegos/travesia/core` y `juegos/travesia/tableros` no se tocan — no importan nada de Node, y esa
+`juegos/salvese/core` y `juegos/salvese/tableros` no se tocan — no importan nada de Node, y esa
 es justamente la razón por la que están separados.
 
 No es la primera opción sólo porque ata el servidor a un runtime que no es Node y
@@ -176,7 +176,7 @@ puede es servir la página por HTTPS y el socket por `ws://`.
 
 **Keep-alive.** Casi todos los proxies cierran un WebSocket ocioso al minuto, y este
 juego tiene tres minutos de silencio de red mientras la mesa discute. El `ping` cada
-25 segundos ya está en el protocolo ([04](../juegos/travesia/docs/specs/04-protocolo.md)) y no es opcional en
+25 segundos ya está en el protocolo ([04](../juegos/salvese/docs/specs/04-protocolo.md)) y no es opcional en
 producción.
 
 **Deploy sincronizado.** Cliente y servidor hablan la misma `VERSION_PROTOCOLO` y no
@@ -198,7 +198,7 @@ cortar una travesía en la noche 4.
 
 ## Google Cast
 
-El receiver es una web app (`D13`), así que es la misma build de `juegos/travesia/tv` servida
+El receiver es una web app (`D13`), así que es la misma build de `juegos/salvese/tv` servida
 por HTTPS. Lo que hay que saber antes de contarlo como hecho:
 
 - Hay que registrar la app en la Cast SDK Developer Console, con un **pago único de
@@ -209,11 +209,11 @@ por HTTPS. Lo que hay que saber antes de contarlo como hecho:
   y tarda un rato en propagarse.
 
 Nada de eso es difícil, pero es un día de trabajo con esperas, no una tarde. Va en
-M5 ([10](../juegos/travesia/docs/specs/10-roadmap.md)), no antes.
+M5 ([10](../juegos/salvese/docs/specs/10-roadmap.md)), no antes.
 
 ## Lo que no se despliega todavía
 
 Base de datos: no hay. Si algún día hay que persistir una partida, se persiste **la
 semilla y el log de comandos**, no el estado — el motor es determinista y reconstruye
-el resto ([11](../juegos/travesia/docs/specs/11-testing.md)). Son unos KB por travesía y sirve igual para
+el resto ([11](../juegos/salvese/docs/specs/11-testing.md)). Son unos KB por travesía y sirve igual para
 compartir una crónica que para reproducir un bug.

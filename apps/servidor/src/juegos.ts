@@ -16,7 +16,7 @@ import type { Montaje } from './estaticos.js';
 export const raizRepo = resolve(fileURLToPath(new URL('.', import.meta.url)), '../../..');
 
 export interface FichaJuego {
-  /** Va en la URL: `/travesia`. */
+  /** Va en la URL: `/salvese`. */
   id: string;
   nombre: string;
   /** Una línea. Es lo que se lee en el menú, a tres metros o en la mano. */
@@ -31,13 +31,13 @@ export interface FichaJuego {
 
 export const JUEGOS: readonly FichaJuego[] = [
   {
-    id: 'travesia',
-    nombre: 'La Travesía',
-    resumen: 'Una caravana cruza una sierra en cinco noches. Cada uno sabe algo que los demás no.',
+    id: 'salvese',
+    nombre: 'Sálvese Quien Pueda',
+    resumen: 'Una caravana cruza una sierra en cinco noches. Decisiones difíciles, secretos ocultos y el desafío de sobrevivir como grupo.',
     jugadores: '2 a 10',
     minutos: 25,
     estado: 'jugable',
-    carpeta: 'travesia',
+    carpeta: 'salvese',
   },
 ];
 

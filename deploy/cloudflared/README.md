@@ -36,8 +36,8 @@ HTTPS y WSS. **No se abre ningún puerto en el router**: el túnel sale desde ad
    | URL | Qué es |
    |---|---|
    | `https://juegos.brianbentancourt.com` | el menú |
-   | `https://juegos.brianbentancourt.com/travesia` | la TV |
-   | `https://juegos.brianbentancourt.com/travesia/control` | el celular |
+   | `https://juegos.brianbentancourt.com/salvese` | la TV |
+   | `https://juegos.brianbentancourt.com/salvese/control` | el celular |
 
 ## Un juego más
 
@@ -55,7 +55,7 @@ falta.
 **WebSockets**: Cloudflare los proxea sin configuración. El *idle timeout* es de
 ~100 segundos y este juego tiene tres minutos de silencio de red mientras la mesa
 discute, así que el `ping` cada 25 s del protocolo no es opcional. Ya está en
-`juegos/travesia/core/src/protocolo.ts`.
+`juegos/salvese/core/src/protocolo.ts`.
 
 **Jugando en tu propia casa**, el tráfico sale a Cloudflare y vuelve. Son unos ms y
 no se notan en este juego, pero si molesta, la alternativa es un registro DNS
