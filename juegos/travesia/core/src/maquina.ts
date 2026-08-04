@@ -532,7 +532,13 @@ export function reducir(estado: EstadoPartida, comando: Comando): Resultado {
                 cumplido = estado.viajeros.every((x) => x.vigor > 0);
                 break;
               case 'sobre-raciones':
-                cumplido = estado.recurso >= (estado.tablero === 'el-salitral' ? 6 : 5);
+                // Objetivo de La Sierra. El equivalente de El Salitral es
+                // 'agua-de-sobra', más abajo: son tableros distintos con ids
+                // de objetivo distintos, aunque midan lo mismo.
+                cumplido = estado.recurso >= 5;
+                break;
+              case 'agua-de-sobra':
+                cumplido = estado.recurso >= 6;
                 break;
               case 'el-perro-llega':
                 cumplido = estado.perro.presente;
@@ -583,6 +589,34 @@ export function reducir(estado: EstadoPartida, comando: Comando): Resultado {
               case 'ver-el-final':
                 cumplido = llegaron;
                 break;
+              case 'nunca-la-aguada': {
+                // Objetivo de El Salitral: que no haya hecho falta desviarse
+                // a reponer agua. Un tramo con costoRecurso negativo repone.
+                let sedesvio = false;
+                for (const entry of estado.cronica) {
+                  const tramoFact = entry.hechos.find((h) => h.startsWith('tramo:'));
+                  if (tramoFact) {
+                    const trName = tramoFact.substring(6);
+                    const trObj = tablero.tramos.find((x) => x.nombre === trName);
+                    if (trObj && trObj.costoRecurso < 0) {
+                      sedesvio = true;
+                    }
+                  }
+                }
+                cumplido = !sedesvio;
+                break;
+              }
+              case 'cruzar-la-sal': {
+                // Objetivo de El Salitral: haber tomado el tramo de la lengua
+                // de sal al menos una vez en la travesía.
+                const tramoDeSal = tablero.tramos.find((x) => x.id === 'la-lengua-de-sal');
+                cumplido = tramoDeSal
+                  ? estado.cronica.some((entry) =>
+                      entry.hechos.some((h) => h === `tramo:${tramoDeSal.nombre}`),
+                    )
+                  : false;
+                break;
+              }
               case 'sin-carga': {
                 // Nunca portador de objeto
                 let cargoObjeto = false;

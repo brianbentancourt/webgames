@@ -110,13 +110,18 @@ de verdad en un Chromium real, no solo leyendo el CSS.
 
 - El epílogo **compartible** (URL, crónica exportable) es de M5, no de este hito;
   lo que hay ahora es la vista en la TV nada más.
-- El motor evalúa los objetivos de El Salitral (`agua-de-sobra`, `nunca-la-aguada`,
-  `cruzar-la-sal`) con el mismo `default: cumplido = llegaron` que cualquier
-  objetivo no reconocido — el `switch` de `maquina.ts` (fase `resolver`) sólo
-  tiene casos explícitos para los de La Sierra. No es un bug de esta ronda: nunca
-  estuvo cubierto, y El Salitral es jugable igual, solo que esos tres objetivos no
-  se evalúan como dicen.
 - Cast/receiver (`D13`) y deploy siguen siendo M5, no se tocaron acá.
+
+**Corregido en esta ronda**: los objetivos propios de El Salitral
+(`agua-de-sobra`, `nunca-la-aguada`, `cruzar-la-sal`) caían todos en el
+`default: cumplido = llegaron` del switch de evaluación en `maquina.ts` — ni
+siquiera el caso `sobre-raciones` de La Sierra, que tenía un ternario
+`estado.tablero === 'el-salitral' ? 6 : 5` pensado para cubrir el equivalente
+de El Salitral, era alcanzable: El Salitral asigna el id `agua-de-sobra`, no
+`sobre-raciones`, así que ese ternario nunca corría. Sin test propio para El
+Salitral nadie lo notó. Ahora los tres tienen su caso explícito y hay un test
+que falla si alguno vuelve a caer en el genérico
+(`maquina.test.ts` → "Objetivos propios de El Salitral se evalúan").
 
 ## M4 · El modelo
 
