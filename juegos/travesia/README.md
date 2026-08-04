@@ -27,12 +27,18 @@ y rival — nunca protagonista.
 | Pieza | Estado |
 |---|---|
 | Tipos, vistas y protocolo | ✅ |
-| Salas y lobby | ✅ |
+| Salas, lobby y votación de tablero | ✅ |
 | Tableros como datos | ✅ dos, La Sierra y El Salitral |
-| Motor de reglas | ❌ especificado, sin implementar |
-| Tablero TV (render) | ⚠️ solo la pantalla de sala |
-| Cliente celular | ⚠️ entrar y marcarse listo |
-| Relato por LLM | ⚠️ corre entero con los textos de respaldo |
+| Motor de reglas (`reducir()`) | ✅ una travesía completa, con tests |
+| Cliente celular | ✅ las cinco noches, `entregar_objeto`, `responder_trato` |
+| Tablero TV | ✅ fogata, candidatos, resolución, alertas, epílogo |
+| Reconexión a mitad de partida | ✅ verificada de punta a punta |
+| Relato por LLM | ⚠️ corre entero con los textos de respaldo; llamada real es M4 |
+
+Verificado con un playtest automatizado real (WebSocket de punta a punta, no el
+motor en memoria) y con Chromium real para `prefers-reduced-motion`. Ver
+[`docs/specs/10-roadmap.md`](docs/specs/10-roadmap.md) para el detalle hito por
+hito, incluidos dos bugs que ese playtest encontró y ya están corregidos.
 
 ## Las piezas
 
@@ -48,11 +54,12 @@ Las salas, el WebSocket y la capa del modelo son del repo, no del juego: viven e
 
 ## Próximo paso
 
-Motor de reglas de una noche completa, en memoria, sin red y sin UI. Si el loop de una noche
-no es interesante en una terminal, no lo va a salvar ninguna animación.
-
-Las reglas ya están escritas en [`docs/specs/03-reglas-de-resolucion.md`](docs/specs/03-reglas-de-resolucion.md);
-falta el cuerpo de `reducir()`.
+M4: la llamada real al modelo. Hoy el juego corre entero con los textos de
+respaldo de cada tablero — que es el mismo camino de código que corre cuando la
+red está mal, así que ya se ejercita en cada partida de desarrollo. Falta la
+llamada real, el presupuesto de tiempo contra la API, y las cinco escenas
+(`resolucion`, `fogon`, `trato`, `apodo`, `epilogo`) de
+[`docs/specs/07-capa-llm.md`](docs/specs/07-capa-llm.md).
 
 ## Documentación
 

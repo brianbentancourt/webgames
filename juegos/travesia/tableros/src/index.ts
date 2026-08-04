@@ -1,13 +1,9 @@
 import { laSierra } from './la-sierra.js';
 import { elSalitral } from './el-salitral.js';
 import { TableroSchema, type Tablero } from './schema.js';
-import { registrarTablero } from '@travesia/core';
 
 export * from './schema.js';
 export { laSierra, elSalitral };
-
-registrarTablero('la-sierra', laSierra as any);
-registrarTablero('el-salitral', elSalitral as any);
 
 /** El primero viene abierto, el resto se desbloquea al terminar una travesía. */
 export const TABLEROS: readonly Tablero[] = [laSierra, elSalitral];

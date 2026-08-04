@@ -54,7 +54,16 @@ export type MensajeEntrante = z.infer<typeof MensajeEntranteSchema>;
 export type MensajeSaliente =
   /** Primer mensaje de toda conexión. Trae el token con el que se reconecta. */
   | { t: 'bienvenida'; version: number; sala: SalaId; jugador?: JugadorId; sesion?: string }
-  | { t: 'sala'; codigo: SalaId; jugadores: { id: JugadorId; nombre: string; listo: boolean }[]; cuentaRegresiva?: number }
+  | {
+      t: 'sala';
+      codigo: SalaId;
+      jugadores: { id: JugadorId; nombre: string; listo: boolean }[];
+      cuentaRegresiva?: number;
+      /** Tableros disponibles para votar. Autocontenido: el cliente no hardcodea la lista. */
+      tableros: { id: string; nombre: string }[];
+      /** Un voto por jugador, si ya votó. */
+      votos: Record<JugadorId, string>;
+    }
   /** Estado completo. Se manda entero en cada transición: no hay parches (D4). */
   | { t: 'tv'; vista: VistaTV }
   | { t: 'jugador'; vista: VistaJugador }

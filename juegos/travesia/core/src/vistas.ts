@@ -23,7 +23,7 @@ export interface VistaTV {
   reloj: number;
   /** La TV muestra dígitos solo en los últimos 30 segundos (D3). */
   mostrarDigitos: boolean;
-  tablero: { id: string; nombre: string; paleta: Paleta; tramo: string };
+  tablero: { id: string; nombre: string; paleta: Paleta; tramo: string; fondo: string };
   /** Sin números: barras cortas, siluetas, quién ya bloqueó. */
   viajeros: ViajeroPublico[];
   perro: { presente: boolean; alerta: string };
@@ -33,6 +33,15 @@ export interface VistaTV {
   ultimaCronica?: EntradaCronica;
   /** Disparadores de animación. La TV nunca decide sola cuándo animar (D4). */
   gatillos: Gatillo[];
+  /** Se llena recién en `epilogo`. La revelación reinterpreta la partida entera. */
+  desenlace?: DesenlacePublico;
+}
+
+export interface DesenlacePublico {
+  llegaron: boolean;
+  perroLlego: boolean;
+  /** Un objetivo por viajero, ya resuelto a texto legible y a si se cumplió. */
+  objetivos: { jugador: JugadorId; nombre: string; texto: string; cumplido: boolean }[];
 }
 
 export interface ViajeroPublico {
@@ -90,10 +99,15 @@ export type Revelacion =
 export type Accion =
   | { tipo: 'elegir_ruta'; opciones: { id: TramoId; nombre: string; pista: string }[] }
   | { tipo: 'elegir_raciones'; opciones: NivelRaciones[] }
-  | { tipo: 'elegir_esfuerzo'; opciones: JugadorId[]; max: number }
+  /**
+   * Nombres, no solo ids: la vista es autocontenida (D4), así que el cliente
+   * no necesita reconstruir un mapa id→nombre a partir de mensajes previos de
+   * la sala para poder mostrar quién es quién.
+   */
+  | { tipo: 'elegir_esfuerzo'; opciones: { id: JugadorId; nombre: string }[]; max: number }
   | { tipo: 'bloquear' }
   | { tipo: 'responder_trato' }
-  | { tipo: 'entregar_objeto'; objeto: ObjetoId; candidatos: JugadorId[] }
+  | { tipo: 'entregar_objeto'; objeto: ObjetoId; candidatos: { id: JugadorId; nombre: string }[] }
   | { tipo: 'votar_tablero'; opciones: { id: string; nombre: string }[] };
 
 /** El aspecto público sale del vigor. Un solo lugar para que TV y celular coincidan. */
@@ -110,7 +124,7 @@ export function aspectoDeVigor(vigor: Vigor): ViajeroPublico['aspecto'] {
   }
 }
 
-const CONFIG_TABLEROS: Record<string, { nombre: string; paleta: Paleta }> = {
+const CONFIG_TABLEROS: Record<string, { nombre: string; paleta: Paleta; fondos: string[] }> = {
   'la-sierra': {
     nombre: 'La Sierra',
     paleta: {
@@ -120,6 +134,7 @@ const CONFIG_TABLEROS: Record<string, { nombre: string; paleta: Paleta }> = {
       cerroCercano: '#080b14',
       brasa: '#ff7a3c',
     },
+    fondos: ['fogata-cerro', 'fogata-vado', 'filo-noche', 'bosque-bajo', 'amanecer-sierra'],
   },
   'el-salitral': {
     nombre: 'El Salitral',
@@ -130,6 +145,33 @@ const CONFIG_TABLEROS: Record<string, { nombre: string; paleta: Paleta }> = {
       cerroCercano: '#0a0910',
       brasa: '#ffb05e',
     },
+    fondos: ['salitral-luna', 'medano-noche', 'aguada', 'monte-bajo', 'amanecer-sal'],
+  },
+};
+
+/**
+ * Texto legible de cada objetivo, por tablero. Duplica lo que ya está en
+ * `@travesia/tableros` (mismo patrón que `CONFIG_TABLEROS` arriba): esta
+ * proyección no depende del paquete de tableros, así que se queda con su
+ * propia copia liviana en vez de importar el catálogo entero.
+ */
+const OBJETIVOS_TEXTO: Record<string, Record<string, string>> = {
+  'la-sierra': {
+    'llegar-entero': 'Llegar sin haberte quebrado nunca.',
+    'que-nadie-quede': 'Que ningún viajero termine quebrado.',
+    'sobre-raciones': 'Que sobren raciones al llegar.',
+    'el-perro-llega': 'Que el perro llegue.',
+    'mano-propia': 'Haber hecho el trabajo pesado más noches que cualquier otro.',
+    'nunca-el-atajo': 'Que la caravana no haya tomado nunca el atajo.',
+    'ver-el-final': 'Llegar. Nada más que eso.',
+  },
+  'el-salitral': {
+    'agua-de-sobra': 'Llegar con agua de sobra.',
+    'nunca-la-aguada': 'Que no haya hecho falta desviarse nunca.',
+    'que-nadie-quede': 'Que ningún viajero termine quebrado.',
+    'el-perro-llega': 'Que el perro llegue.',
+    'cruzar-la-sal': 'Haber cruzado la lengua de sal.',
+    'sin-carga': 'Llegar sin cargar nada.',
   },
 };
 
@@ -137,7 +179,17 @@ function obtenerNombreObjeto(arquetipo: string): string {
   return arquetipo.replace(/-/g, ' ');
 }
 
-export function proyectarTV(estado: EstadoPartida, ahora = Date.now()): VistaTV {
+export function proyectarTV(
+  estado: EstadoPartida,
+  ahora = Date.now(),
+  /**
+   * Gatillos de ESTA publicación, no del estado. Los pone el llamador a partir
+   * de `Efecto.publicar.gatillos` (ver maquina.ts): nacen en la transición que
+   * los dispara y no se recalculan acá. Una republicación que no viene de esa
+   * transición —reconexión, heartbeat— no trae ninguno, y la TV no anima nada.
+   */
+  gatillosExtra: Gatillo[] = [],
+): VistaTV {
   let reloj = 0;
   let mostrarDigitos = false;
   if (estado.nocheActual?.venceEn) {
@@ -189,8 +241,25 @@ export function proyectarTV(estado: EstadoPartida, ahora = Date.now()): VistaTV 
       pista: c.pista,
     })) ?? [];
 
-  const gatillos: Gatillo[] =
-    estado.fase === 'resolver' ? [{ tipo: 'resolucion', duracionMs: TIEMPOS.resolverMs }] : [];
+  // Un fondo por noche, determinista: misma noche siempre pinta el mismo
+  // fondo, sin importar cuántas veces se reproyecte (D4). No hay generación
+  // en vivo (07-capa-llm.md): esto elige de la librería estática del tablero.
+  const fondosDelTablero = CONFIG_TABLEROS[estado.tablero]?.fondos ?? CONFIG_TABLEROS['la-sierra']!.fondos;
+  const indiceFondo = Math.max(0, estado.noche - 1) % fondosDelTablero.length;
+  const fondo = fondosDelTablero[indiceFondo]!;
+
+  const desenlace: DesenlacePublico | undefined = estado.desenlace
+    ? {
+        llegaron: estado.desenlace.llegaron,
+        perroLlego: estado.desenlace.perroLlego,
+        objetivos: estado.viajeros.map((v) => ({
+          jugador: v.id,
+          nombre: v.nombre,
+          texto: OBJETIVOS_TEXTO[estado.tablero]?.[v.objetivo] ?? 'Un objetivo personal.',
+          cumplido: estado.desenlace!.objetivosCumplidos.includes(v.id),
+        })),
+      }
+    : undefined;
 
   return {
     fase: estado.fase,
@@ -204,6 +273,7 @@ export function proyectarTV(estado: EstadoPartida, ahora = Date.now()): VistaTV 
       nombre: CONFIG_TABLEROS[estado.tablero]?.nombre ?? estado.tablero,
       paleta: CONFIG_TABLEROS[estado.tablero]?.paleta ?? CONFIG_TABLEROS['la-sierra']!.paleta,
       tramo: tramoName,
+      fondo,
     },
     viajeros,
     perro: {
@@ -212,10 +282,11 @@ export function proyectarTV(estado: EstadoPartida, ahora = Date.now()): VistaTV 
     },
     objetos,
     candidatos,
-    gatillos,
+    gatillos: gatillosExtra,
     ...(estado.cronica[estado.cronica.length - 1]
       ? { ultimaCronica: estado.cronica[estado.cronica.length - 1] }
       : {}),
+    ...(desenlace ? { desenlace } : {}),
   };
 }
 
@@ -349,7 +420,9 @@ export function proyectarJugador(
         },
         {
           tipo: 'elegir_esfuerzo',
-          opciones: estado.viajeros.filter((v) => v.vigor > 0).map((v) => v.id),
+          opciones: estado.viajeros
+            .filter((v) => v.vigor > 0)
+            .map((v) => ({ id: v.id, nombre: v.nombre })),
           max: 3,
         },
         { tipo: 'bloquear' },
@@ -364,7 +437,7 @@ export function proyectarJugador(
       acciones.push({
         tipo: 'entregar_objeto',
         objeto: yo.objeto,
-        candidatos: otrosJugadores.map((v) => v.id),
+        candidatos: otrosJugadores.map((v) => ({ id: v.id, nombre: v.nombre })),
       });
     }
     if (estado.tratoOfrecidoA === jugadorId && !yo.aceptoElTrato) {
@@ -375,7 +448,7 @@ export function proyectarJugador(
       acciones.push({
         tipo: 'entregar_objeto',
         objeto: yo.objeto,
-        candidatos: otrosJugadores.map((v) => v.id),
+        candidatos: otrosJugadores.map((v) => ({ id: v.id, nombre: v.nombre })),
       });
     }
   } else if (enLobby) {

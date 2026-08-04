@@ -30,6 +30,9 @@ function ContenidoApp() {
   const [enJuego, setEnJuego] = useState(false);
   const [vistaJuego, setVistaJuego] = useState<VistaJugador | null>(null);
   const [jugadores, setJugadores] = useState<{ id: string; nombre: string }[]>([]);
+  const [miId, setMiId] = useState<string | null>(null);
+  const [tableros, setTableros] = useState<{ id: string; nombre: string }[]>([]);
+  const [votos, setVotos] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -43,6 +46,7 @@ function ContenidoApp() {
     if (ultimo === null) return;
     if (ultimo.t === 'bienvenida' && ultimo.jugador !== undefined) {
       setDentro(true);
+      setMiId(ultimo.jugador);
       setError(null);
       setCargando(false);
     }
@@ -59,14 +63,14 @@ function ContenidoApp() {
     if (ultimo.t === 'sala') {
       setCuentaRegresiva(ultimo.cuentaRegresiva ?? null);
       setJugadores(ultimo.jugadores);
+      setTableros(ultimo.tableros);
+      setVotos(ultimo.votos);
     }
     if (ultimo.t === 'jugador') {
       setEnJuego(true);
       setVistaJuego(ultimo.vista);
     }
   }, [ultimo, codigo, nombre, mandar]);
-
-  const nombreDe = (id: string) => jugadores.find((j) => j.id === id)?.nombre ?? id;
 
   const handleEntrar = () => {
     if (cargando) return;
@@ -90,7 +94,7 @@ function ContenidoApp() {
   }
 
   if (enJuego && vistaJuego) {
-    return <JuegoControl vista={vistaJuego} mandar={mandar} nombreDe={nombreDe} />;
+    return <JuegoControl vista={vistaJuego} mandar={mandar} />;
   }
 
   if (!dentro) {
@@ -127,11 +131,37 @@ function ContenidoApp() {
     );
   }
 
+  const miVoto = miId !== null ? votos[miId] : undefined;
+  const totalVotos = Object.keys(votos).length;
+
   return (
     <main className="pantalla">
       <p className="titulo">{nombre}</p>
       <p className="linea">Ya estás en la caravana. Mirá la tele.</p>
-      
+
+      {cuentaRegresiva === null && tableros.length > 0 && (
+        <div className="opciones">
+          <p className="linea" style={{ marginBottom: 4 }}>¿Por qué tablero votás?</p>
+          {tableros.map((t) => {
+            const votosDeEste = Object.values(votos).filter((v) => v === t.id).length;
+            return (
+              <button
+                key={t.id}
+                className={`boton-opcion ${miVoto === t.id ? 'seleccionado' : ''}`}
+                onClick={() => mandar({ t: 'votar_tablero', tablero: t.id })}
+              >
+                <span className="opcion-nombre">{t.nombre}</span>
+                {votosDeEste > 0 && (
+                  <span className="opcion-detalle">
+                    {votosDeEste} de {totalVotos} voto{totalVotos === 1 ? '' : 's'}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {cuentaRegresiva !== null ? (
         <p className="linea" style={{ color: 'var(--brasa)', fontWeight: 'bold' }}>
           Iniciando en {cuentaRegresiva} segundos...

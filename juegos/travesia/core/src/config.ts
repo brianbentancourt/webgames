@@ -22,6 +22,8 @@ export const TIEMPOS = {
   decidirDigitosMs: 30_000,
   resolverMs: 7_000,
   fogonMs: 30_000,
+  /** Pulso de un gatillo de alerta: objeto, quiebre o perro (08-cliente-tv.md). */
+  alertaMs: 1_500,
   /** Presupuesto de la llamada al modelo dentro de la cutscene. Si vence, va el respaldo. */
   llmPresupuestoMs: 5_500,
 } as const;

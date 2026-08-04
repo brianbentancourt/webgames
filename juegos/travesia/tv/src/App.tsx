@@ -26,6 +26,8 @@ export function App() {
   const [cuentaRegresiva, setCuentaRegresiva] = useState<number | null>(null);
   const [enJuego, setEnJuego] = useState(false);
   const [vistaJuego, setVistaJuego] = useState<any>(null);
+  const [tableros, setTableros] = useState<{ id: string; nombre: string }[]>([]);
+  const [votos, setVotos] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (ultimo === null) return;
@@ -33,6 +35,8 @@ export function App() {
       setCodigo(ultimo.codigo);
       setJugadores(ultimo.jugadores);
       setCuentaRegresiva(ultimo.cuentaRegresiva ?? null);
+      setTableros(ultimo.tableros);
+      setVotos(ultimo.votos);
     }
     if (ultimo.t === 'tv') {
       setEnJuego(true);
@@ -94,6 +98,15 @@ export function App() {
           </li>
         ))}
       </ul>
+
+      {cuentaRegresiva === null && tableros.length > 0 && (
+        <p className="al-pie">
+          tablero:{' '}
+          {tableros
+            .map((t) => `${t.nombre} (${Object.values(votos).filter((v) => v === t.id).length})`)
+            .join(' · ')}
+        </p>
+      )}
 
       <p className="al-pie">
         {cuentaRegresiva !== null ? (

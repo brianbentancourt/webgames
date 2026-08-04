@@ -33,22 +33,47 @@ export function PantallaRaciones({ accion, onSiguiente }: BaseProps & { accion: 
   );
 }
 
-export function PantallaEsfuerzo({ accion, onSiguiente, nombreDe }: BaseProps & { accion: Extract<Accion, { tipo: 'elegir_esfuerzo' }>, nombreDe: (id: string) => string }) {
+export function PantallaEsfuerzo({ accion, onSiguiente }: BaseProps & { accion: Extract<Accion, { tipo: 'elegir_esfuerzo' }> }) {
   // Para esfuerzo pueden elegirse múltiples hasta el max, pero simplificando
-  // el usuario podría elegir a uno o pasar. Como el spec dice "rápido", podemos 
-  // mostrar la lista y dejar que elija uno o "Ninguno". 
+  // el usuario podría elegir a uno o pasar. Como el spec dice "rápido", podemos
+  // mostrar la lista y dejar que elija uno o "Ninguno".
   // Idealmente mantendría estado local, pero para no sobrecargar, pasamos un array.
   return (
     <div className="opciones">
       <p className="titulo">EL ESFUERZO</p>
       <p className="linea" style={{ marginBottom: 12 }}>¿Quién gasta vigor para que la caravana avance más rápido esta noche?</p>
-      {accion.opciones.map((id) => (
-        <button key={id} className="boton-opcion" onClick={() => onSiguiente([id])}>
-          <span className="opcion-nombre">{nombreDe(id)}</span>
+      {accion.opciones.map((o) => (
+        <button key={o.id} className="boton-opcion" onClick={() => onSiguiente([o.id])}>
+          <span className="opcion-nombre">{o.nombre}</span>
         </button>
       ))}
       <button className="boton-opcion" onClick={() => onSiguiente([])}>
         <span className="opcion-nombre">Nadie</span>
+      </button>
+    </div>
+  );
+}
+
+export function PantallaEntregarObjeto({
+  accion,
+  onEntregar,
+  onOmitir,
+}: {
+  accion: Extract<Accion, { tipo: 'entregar_objeto' }>;
+  onEntregar: (id: string) => void;
+  onOmitir: () => void;
+}) {
+  return (
+    <div className="opciones">
+      <p className="titulo">EL OBJETO</p>
+      <p className="linea" style={{ marginBottom: 12 }}>¿Se lo pasás a alguien, o te lo quedás?</p>
+      {accion.candidatos.map((c) => (
+        <button key={c.id} className="boton-opcion" onClick={() => onEntregar(c.id)}>
+          <span className="opcion-nombre">Dárselo a {c.nombre}</span>
+        </button>
+      ))}
+      <button className="boton-opcion secundario" onClick={onOmitir}>
+        <span className="opcion-nombre">Me lo quedo</span>
       </button>
     </div>
   );

@@ -160,6 +160,21 @@ body::before {
   clip-path: polygon(0 94%, 30% 88%, 60% 95%, 100% 90%, 100% 100%, 0 100%);
 }
 
+/*
+ * Fondo ilustrado (librería estática, ver PROMPTS.md). Si el archivo no
+ * cargó todavía, `background-image` no pinta nada acá y quedan visibles las
+ * capas de degradé de arriba — es el respaldo, no hace falta más lógica.
+ * El degradé oscuro que viaja junto a la imagen (armado en JuegoTV.tsx) es
+ * el scrim: garantiza que el texto de los paneles se siga leyendo encima de
+ * cualquier fondo, sea claro u oscuro.
+ */
+.fondo-ilustrado {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+}
+
 .ui-superior {
   position: relative;
   padding: var(--overscan) calc(var(--overscan) * 1.2) 0;
@@ -202,7 +217,9 @@ body::before {
 }
 
 .silueta-avatar-sombra {
-  filter: drop-shadow(4px 6px 0px rgba(0, 0, 0, 0.4));
+  /* Sombra difusa, no el recorte de cartulina duro de antes: así es como
+     cae la luz sobre una figura de papel real, no sobre un vector plano. */
+  filter: drop-shadow(0 1.1vh 1.3vh rgba(0, 0, 0, 0.5));
   transition: transform 0.6s steps(4, end);
 }
 
@@ -223,23 +240,59 @@ body::before {
 .silueta-avatar-perro {
   width: 5vh;
   height: 8vh;
-  background: #c2b59e; /* Color cartón base */
+  /* Faceta de papel: un brillo suave arriba a la izquierda donde pegaría la
+     luz, oscureciendo hacia abajo a la derecha — no un color plano. */
+  background-image:
+    radial-gradient(circle at 30% 18%, rgba(255, 255, 255, 0.4), transparent 55%),
+    linear-gradient(150deg, color-mix(in srgb, #c2b59e 100%, white 15%) 0%, #c2b59e 45%, color-mix(in srgb, #c2b59e 100%, black 25%) 100%);
   clip-path: polygon(15% 5%, 85% 8%, 95% 95%, 5% 98%);
   transform: rotate(-2deg);
 }
 
 /* Darle personalidad y colores a los recortes según el índice */
-.silueta-viajero:nth-child(1) .silueta-avatar { background: #5a7b8c; clip-path: polygon(10% 5%, 85% 15%, 90% 90%, 15% 100%); }
-.silueta-viajero:nth-child(2) .silueta-avatar { background: #8c5a5a; clip-path: polygon(20% 0%, 90% 5%, 95% 95%, 5% 95%); }
-.silueta-viajero:nth-child(3) .silueta-avatar { background: #5a8c6b; clip-path: polygon(15% 10%, 85% 5%, 100% 100%, 0% 100%); }
-.silueta-viajero:nth-child(4) .silueta-avatar { background: #826a8c; clip-path: polygon(5% 5%, 95% 10%, 85% 95%, 10% 90%); }
-.silueta-viajero:nth-child(5) .silueta-avatar { background: #8c7c5a; clip-path: polygon(12% 0%, 88% 5%, 96% 92%, 8% 98%); }
-.silueta-viajero:nth-child(6) .silueta-avatar { background: #5a5a8c; clip-path: polygon(10% 8%, 90% 2%, 92% 98%, 5% 90%); }
+.silueta-viajero:nth-child(1) .silueta-avatar {
+  background-image:
+    radial-gradient(circle at 30% 18%, rgba(255, 255, 255, 0.4), transparent 55%),
+    linear-gradient(150deg, color-mix(in srgb, #5a7b8c 100%, white 20%) 0%, #5a7b8c 45%, color-mix(in srgb, #5a7b8c 100%, black 30%) 100%);
+  clip-path: polygon(10% 5%, 85% 15%, 90% 90%, 15% 100%);
+}
+.silueta-viajero:nth-child(2) .silueta-avatar {
+  background-image:
+    radial-gradient(circle at 30% 18%, rgba(255, 255, 255, 0.4), transparent 55%),
+    linear-gradient(150deg, color-mix(in srgb, #8c5a5a 100%, white 20%) 0%, #8c5a5a 45%, color-mix(in srgb, #8c5a5a 100%, black 30%) 100%);
+  clip-path: polygon(20% 0%, 90% 5%, 95% 95%, 5% 95%);
+}
+.silueta-viajero:nth-child(3) .silueta-avatar {
+  background-image:
+    radial-gradient(circle at 30% 18%, rgba(255, 255, 255, 0.4), transparent 55%),
+    linear-gradient(150deg, color-mix(in srgb, #5a8c6b 100%, white 20%) 0%, #5a8c6b 45%, color-mix(in srgb, #5a8c6b 100%, black 30%) 100%);
+  clip-path: polygon(15% 10%, 85% 5%, 100% 100%, 0% 100%);
+}
+.silueta-viajero:nth-child(4) .silueta-avatar {
+  background-image:
+    radial-gradient(circle at 30% 18%, rgba(255, 255, 255, 0.4), transparent 55%),
+    linear-gradient(150deg, color-mix(in srgb, #826a8c 100%, white 20%) 0%, #826a8c 45%, color-mix(in srgb, #826a8c 100%, black 30%) 100%);
+  clip-path: polygon(5% 5%, 95% 10%, 85% 95%, 10% 90%);
+}
+.silueta-viajero:nth-child(5) .silueta-avatar {
+  background-image:
+    radial-gradient(circle at 30% 18%, rgba(255, 255, 255, 0.4), transparent 55%),
+    linear-gradient(150deg, color-mix(in srgb, #8c7c5a 100%, white 20%) 0%, #8c7c5a 45%, color-mix(in srgb, #8c7c5a 100%, black 30%) 100%);
+  clip-path: polygon(12% 0%, 88% 5%, 96% 92%, 8% 98%);
+}
+.silueta-viajero:nth-child(6) .silueta-avatar {
+  background-image:
+    radial-gradient(circle at 30% 18%, rgba(255, 255, 255, 0.4), transparent 55%),
+    linear-gradient(150deg, color-mix(in srgb, #5a5a8c 100%, white 20%) 0%, #5a5a8c 45%, color-mix(in srgb, #5a5a8c 100%, black 30%) 100%);
+  clip-path: polygon(10% 8%, 90% 2%, 92% 98%, 5% 90%);
+}
 
 .silueta-avatar-perro {
   width: 4vh;
   height: 4vh;
-  background: #a38965; /* Color cartón marrón para el perro */
+  background-image:
+    radial-gradient(circle at 30% 18%, rgba(255, 255, 255, 0.35), transparent 55%),
+    linear-gradient(150deg, color-mix(in srgb, #a38965 100%, white 20%) 0%, #a38965 45%, color-mix(in srgb, #a38965 100%, black 30%) 100%);
   clip-path: polygon(10% 10%, 85% 5%, 95% 85%, 5% 90%);
   transform: rotate(3deg);
 }
@@ -316,7 +369,11 @@ body::before {
   width: 6vh;
   height: 8vh;
   margin-left: -3vh;
-  background: #c93a22;
+  /* Cada lengua de fuego ya es una capa de color distinta (base→medio→centro
+     va de rojo a amarillo); acá además cada una tiene su propia faceta, en
+     vez de ser un color plano recortado. */
+  background: radial-gradient(circle at 50% 25%, #ff8a52, #c93a22 60%, #8a2412 100%);
+  filter: drop-shadow(0 0.8vh 1vh rgba(201, 58, 34, 0.5));
   clip-path: polygon(50% 0%, 100% 40%, 80% 100%, 20% 100%, 0% 50%);
   animation-delay: 0s;
 }
@@ -325,7 +382,7 @@ body::before {
   width: 4vh;
   height: 6vh;
   margin-left: -2vh;
-  background: #f06a26;
+  background: radial-gradient(circle at 50% 25%, #ffb066, #f06a26 60%, #c94a12 100%);
   clip-path: polygon(40% 10%, 90% 50%, 70% 100%, 30% 100%, 10% 60%);
   animation-delay: 0.1s;
 }
@@ -334,7 +391,7 @@ body::before {
   width: 2.5vh;
   height: 4vh;
   margin-left: -1.25vh;
-  background: #ffcc44;
+  background: radial-gradient(circle at 50% 25%, #fff2c2, #ffcc44 65%, #f0a020 100%);
   clip-path: polygon(50% 15%, 85% 60%, 65% 100%, 35% 100%, 15% 55%);
   animation-delay: 0.2s;
 }
@@ -379,13 +436,65 @@ body::before {
   position: absolute;
   inset: 0;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 1.4vh;
+  padding: 0 10vw;
+  text-align: center;
 }
 
 .espera-texto {
   font-size: 3.4vh;
   opacity: 0.75;
+}
+
+.epilogo-titulo {
+  font-size: 4.2vh;
+  color: var(--brasa);
+}
+
+.epilogo-perro {
+  font-size: 2.4vh;
+  opacity: 0.85;
+}
+
+.epilogo-objetivos {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.4vh 1.6vw;
+  justify-content: center;
+  margin-top: 1vh;
+}
+
+.epilogo-objetivos li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3vh;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 1.2vh 1.6vw;
+  max-width: 26ch;
+  clip-path: polygon(2% 3%, 98% 1%, 97% 97%, 3% 98%);
+}
+
+.objetivo-cumplido {
+  border-left: 0.4vh solid var(--brasa);
+}
+
+.objetivo-fallado {
+  border-left: 0.4vh solid rgba(232, 226, 214, 0.25);
+  opacity: 0.7;
+}
+
+.objetivo-nombre {
+  font-size: 2vh;
+  color: var(--brasa);
+}
+
+.objetivo-texto {
+  font-size: 1.8vh;
+  opacity: 0.85;
 }
 
 /* Resolución: única cutscene dramática de la noche (D4 § tres niveles). */

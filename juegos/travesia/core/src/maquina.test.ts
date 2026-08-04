@@ -35,8 +35,42 @@ const tableroTest = {
   },
 };
 
+// El Salitral tiene objetivos propios (agua-de-sobra, nunca-la-aguada,
+// cruzar-la-sal) que el switch de evaluación de objetivos no cubría: caían
+// todos en el `default` genérico (cumplido = llegaron) sin que ningún test lo
+// notara, porque el único tablero de prueba era La Sierra.
+const tableroSalitralTest = {
+  id: 'el-salitral',
+  nombre: 'El Salitral',
+  noches: 5,
+  distancia: 28,
+  recursoCritico: { id: 'agua', nombre: 'agua', inicial: 24, capacidad: 30 },
+  tramos: [
+    { id: 'costra-blanca', nombre: 'la costra blanca', dureza: 1, costoRecurso: 2, hallazgo: 0.1, pista: 'plano', terreno: '...' },
+    { id: 'la-aguada', nombre: 'la aguada', dureza: 2, costoRecurso: -2, hallazgo: 0.15, pista: 'desvío', terreno: '...' },
+    { id: 'la-lengua-de-sal', nombre: 'la lengua de sal', dureza: 2, costoRecurso: 3, hallazgo: 0.5, pista: 'brilla', terreno: '...' },
+  ],
+  mazoObjetos: [
+    { id: 'bordalesa', nombre: 'la bordalesa', clase: 'pesa' as const, efecto: '...', usos: 5 },
+  ],
+  objetivos: [
+    { id: 'agua-de-sobra', texto: 'Llegar con agua de sobra.', condicion: 'recurso final >= 6' },
+    { id: 'nunca-la-aguada', texto: 'Que no haya hecho falta desviarse nunca.', condicion: '...' },
+    { id: 'cruzar-la-sal', texto: 'Haber cruzado la lengua de sal.', condicion: '...' },
+    { id: 'que-nadie-quede', texto: 'Que ningún viajero termine quebrado.', condicion: '...' },
+    { id: 'el-perro-llega', texto: 'Que el perro llegue.', condicion: '...' },
+  ],
+  vozDelCamino: 'Voz del camino test',
+  fondos: ['salitral-luna'],
+  respaldos: {
+    resolucion: ['Se camina de noche.'],
+    fogon: ['¿Cuánta agua creen que queda?'],
+  },
+};
+
 beforeAll(() => {
   registrarTablero('la-sierra', tableroTest as any);
+  registrarTablero('el-salitral', tableroSalitralTest as any);
 });
 
 describe('Motor de Reglas - La Travesía', () => {
@@ -249,5 +283,49 @@ describe('Motor de Reglas - La Travesía', () => {
     expect(jsonVale.includes('llegar-entero')).toBe(false);
     // Vale no debe ver el terreno secreto del Baqueano
     expect(jsonVale.includes('Terreno secreto del Baqueano')).toBe(false);
+  });
+
+  test('Objetivos propios de El Salitral se evalúan (no caen en el default)', () => {
+    // Estado construido a mano justo antes del vencio_fase que cierra la
+    // última noche: la crónica ya tiene lo que hizo falta que pasara.
+    const estado: EstadoPartida = {
+      id: partidaId('partida-salitral'),
+      tablero: 'el-salitral' as any,
+      semilla: 'test-salitral',
+      fase: 'resolver',
+      noche: 5,
+      nochesTotales: 5,
+      avance: 28,
+      distanciaTotal: 28,
+      recurso: 7,
+      capacidad: 30,
+      viajeros: [
+        // Le sobra agua (recurso final 7 >= 6): cumple.
+        { id: jugadorId('j-1'), nombre: 'Nico', rol: 'baqueano', asiento: 0, vigor: 3, objetivo: 'agua-de-sobra' as any, conectado: true, cegado: false, aceptoElTrato: false },
+        // La caravana sí se desvió a la aguada (costoRecurso < 0) en la noche 2: no cumple.
+        { id: jugadorId('j-2'), nombre: 'Vale', rol: 'curandera', asiento: 1, vigor: 3, objetivo: 'nunca-la-aguada' as any, conectado: true, cegado: false, aceptoElTrato: false },
+        // Cruzaron la lengua de sal en la noche 4: cumple.
+        { id: jugadorId('j-3'), nombre: 'Seba', rol: 'despensero', asiento: 2, vigor: 3, objetivo: 'cruzar-la-sal' as any, conectado: true, cegado: false, aceptoElTrato: false },
+      ],
+      perro: { presente: true, alerta: 'ninguna', dice_la_verdad: true },
+      objetos: [],
+      cronica: [
+        { noche: 1, hechos: ['tramo:la costra blanca', 'avance:2', 'recurso:2'], relato: '...', origen: 'respaldo' },
+        { noche: 2, hechos: ['tramo:la aguada', 'avance:2', 'recurso:2'], relato: '...', origen: 'respaldo' },
+        { noche: 3, hechos: ['tramo:la costra blanca', 'avance:2', 'recurso:2'], relato: '...', origen: 'respaldo' },
+        { noche: 4, hechos: ['tramo:la lengua de sal', 'avance:2', 'recurso:2'], relato: '...', origen: 'respaldo' },
+        { noche: 5, hechos: ['tramo:la costra blanca', 'avance:2', 'recurso:2'], relato: '...', origen: 'respaldo' },
+      ],
+    };
+
+    const r = reducir(estado, { t: 'vencio_fase' });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+
+    expect(r.transicion.estado.fase).toBe('epilogo');
+    const cumplidos = r.transicion.estado.desenlace?.objetivosCumplidos ?? [];
+    expect(cumplidos).toContain(jugadorId('j-1')); // agua-de-sobra
+    expect(cumplidos).not.toContain(jugadorId('j-2')); // nunca-la-aguada: se desviaron
+    expect(cumplidos).toContain(jugadorId('j-3')); // cruzar-la-sal
   });
 });

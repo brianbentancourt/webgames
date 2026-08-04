@@ -29,7 +29,16 @@ export interface Sala {
   tableroVotado: Map<JugadorId, string>;
   creadaEn: number;
   partida?: EstadoPartida;
-  timerId?: NodeJS.Timeout;
+  /** Cuenta regresiva de "todos listos" antes de que exista `partida`. */
+  lobbyTimerId?: NodeJS.Timeout;
+  /**
+   * Reloj de la fase en curso, una vez que existe `partida` (viene de un
+   * efecto `agendar` del motor). Campo separado a propósito: si compartiera
+   * el mismo timer que el lobby, un jugador reconectando a mitad de una noche
+   * cancelaría el único reloj que hace avanzar la partida y la travesía
+   * quedaría congelada para siempre sin que nadie lo note.
+   */
+  faseTimerId?: NodeJS.Timeout;
 }
 
 const salas = new Map<SalaId, Sala>();
@@ -60,7 +69,8 @@ export function obtenerSala(codigo: string): Sala | undefined {
 export function cerrarSala(codigo: SalaId): void {
   const sala = salas.get(codigo);
   if (sala) {
-    if (sala.timerId) clearTimeout(sala.timerId);
+    if (sala.lobbyTimerId) clearTimeout(sala.lobbyTimerId);
+    if (sala.faseTimerId) clearTimeout(sala.faseTimerId);
     salas.delete(codigo);
   }
 }
