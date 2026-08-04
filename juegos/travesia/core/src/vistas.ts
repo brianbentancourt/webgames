@@ -23,7 +23,7 @@ export interface VistaTV {
   reloj: number;
   /** La TV muestra dígitos solo en los últimos 30 segundos (D3). */
   mostrarDigitos: boolean;
-  tablero: { id: string; nombre: string; paleta: Paleta; tramo: string };
+  tablero: { id: string; nombre: string; paleta: Paleta; tramo: string; fondo: string };
   /** Sin números: barras cortas, siluetas, quién ya bloqueó. */
   viajeros: ViajeroPublico[];
   perro: { presente: boolean; alerta: string };
@@ -124,7 +124,7 @@ export function aspectoDeVigor(vigor: Vigor): ViajeroPublico['aspecto'] {
   }
 }
 
-const CONFIG_TABLEROS: Record<string, { nombre: string; paleta: Paleta }> = {
+const CONFIG_TABLEROS: Record<string, { nombre: string; paleta: Paleta; fondos: string[] }> = {
   'la-sierra': {
     nombre: 'La Sierra',
     paleta: {
@@ -134,6 +134,7 @@ const CONFIG_TABLEROS: Record<string, { nombre: string; paleta: Paleta }> = {
       cerroCercano: '#080b14',
       brasa: '#ff7a3c',
     },
+    fondos: ['fogata-cerro', 'fogata-vado', 'filo-noche', 'bosque-bajo', 'amanecer-sierra'],
   },
   'el-salitral': {
     nombre: 'El Salitral',
@@ -144,6 +145,7 @@ const CONFIG_TABLEROS: Record<string, { nombre: string; paleta: Paleta }> = {
       cerroCercano: '#0a0910',
       brasa: '#ffb05e',
     },
+    fondos: ['salitral-luna', 'medano-noche', 'aguada', 'monte-bajo', 'amanecer-sal'],
   },
 };
 
@@ -239,6 +241,13 @@ export function proyectarTV(
       pista: c.pista,
     })) ?? [];
 
+  // Un fondo por noche, determinista: misma noche siempre pinta el mismo
+  // fondo, sin importar cuántas veces se reproyecte (D4). No hay generación
+  // en vivo (07-capa-llm.md): esto elige de la librería estática del tablero.
+  const fondosDelTablero = CONFIG_TABLEROS[estado.tablero]?.fondos ?? CONFIG_TABLEROS['la-sierra']!.fondos;
+  const indiceFondo = Math.max(0, estado.noche - 1) % fondosDelTablero.length;
+  const fondo = fondosDelTablero[indiceFondo]!;
+
   const desenlace: DesenlacePublico | undefined = estado.desenlace
     ? {
         llegaron: estado.desenlace.llegaron,
@@ -264,6 +273,7 @@ export function proyectarTV(
       nombre: CONFIG_TABLEROS[estado.tablero]?.nombre ?? estado.tablero,
       paleta: CONFIG_TABLEROS[estado.tablero]?.paleta ?? CONFIG_TABLEROS['la-sierra']!.paleta,
       tramo: tramoName,
+      fondo,
     },
     viajeros,
     perro: {

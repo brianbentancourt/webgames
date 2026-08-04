@@ -33,6 +33,18 @@ export function JuegoTV({ vista }: { vista: VistaTV }) {
       <div className="capa-sombra"><div className="fondo-capa capa-medio" /></div>
       <div className="capa-sombra"><div className="fondo-capa capa-cercano" /></div>
 
+      {/*
+        Librería estática de fondos (07-capa-llm.md): si el archivo no existe
+        todavía, `background-image` no carga nada y quedan visibles las capas
+        de degradé de arriba — no hace falta lógica de respaldo aparte.
+      */}
+      <div
+        className="fondo-ilustrado"
+        style={{
+          backgroundImage: `linear-gradient(to bottom, rgba(0,0,0,.4), rgba(0,0,0,.1) 35%, rgba(0,0,0,.6)), url("${import.meta.env.BASE_URL}fondos/${vista.tablero.fondo}.jpg")`,
+        }}
+      />
+
       <div className="ui-superior">
         <h2 className="noche-indicador">Noche {vista.noche} de {vista.nochesTotales}</h2>
         <h1 className="tablero-nombre">{vista.tablero.nombre}</h1>
