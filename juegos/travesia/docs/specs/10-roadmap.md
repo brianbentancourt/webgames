@@ -123,6 +123,47 @@ Salitral nadie lo notó. Ahora los tres tienen su caso explícito y hay un test
 que falla si alguno vuelve a caer en el genérico
 (`maquina.test.ts` → "Objetivos propios de El Salitral se evalúan").
 
+## M3.5 · Lo que encontró jugar la partida entera, no leer el código
+
+Un playtest real (TV + 3 celulares reales, click a click, las 5 noches) encontró
+cuatro cosas que ningún typecheck ni test iba a atrapar porque solo se ven con
+contenido real en pantalla. Ninguna está bloqueada por M4: las cuatro se resuelven
+con lo que ya existe en `packages/tableros` y en el estado.
+
+- **El fogón no dice nada.** Es el pilar 4 del diseño ("la partida deja una
+  anécdota") y hoy son 30 segundos de pantalla muda — ni pregunta, ni en la TV
+  ni en ningún celular. No espera al LLM: cada tablero ya tiene
+  `respaldos.fogon` con preguntas escritas (`"¿Quién decidió esto, en serio?"`)
+  que nada conecta. Mismo patrón que ya existe para `resolucion`: elegir un
+  respaldo al entrar a `fogon`, guardarlo en el estado, exponerlo en
+  `VistaTV`, pintar un `panel-fogon` en `JuegoTV.tsx`. Es la falla más citada
+  del playtest y la más barata de cerrar.
+- **El perro es mudo.** D10 lo llama "el único dato público del juego", pero
+  las cuatro alertas (`ninguna`/`inquieto`/`grune`/`no_avanza`) no tienen
+  ninguna diferencia visual — es el mismo rectángulo marrón siempre. No es un
+  problema de arte final, es la mecánica sin transmitir la información para la
+  que existe. Necesita una pasada de diseño chica (una postura o tinte por
+  estado, no texto — "se mira de reojo") antes de ser solo CSS.
+- **El epílogo se rompe con contenido real.** El `panel-epilogo` centra la
+  lista de objetivos en el mismo eje vertical que `.escenario` (la caravana +
+  la fogata), así que con 3+ jugadores una tarjeta queda literalmente encima
+  del fuego. Bug de layout, no de datos — el desenlace en sí es correcto.
+- **El celular no tiene revelación propia.** 25 minutos sosteniendo el
+  teléfono y el pago —tu objetivo secreto, cumplido o no— se ve solo en la
+  TV; el celular repite el mismo "no te toca ninguna acción" genérico que usó
+  toda la partida. Rompe los pilares 2 y 3: la persona que más le prestó
+  atención a su rol es la que menos se entera de cómo terminó. Hace falta
+  sumar el objetivo propio (texto + cumplido) a `VistaJugador` en fase
+  `epilogo` y una pantalla en `JuegoControl.tsx` que lo muestre.
+
+**Deliberadamente afuera de esta ronda**: el arte final de la TV (la estética
+"paper cutout" ya está escrita en `.agents/rules/travesia-aesthetics.md` y
+aplicada en el portal, pero no en `Caravana.tsx`/`Fogata.tsx` — vale la pena
+unificarlo, pero es una pasada de arte más grande, no un bug), y sonido —no
+hay spec de audio y no es MVP; si se suma algo, un solo pulso al bloquear la
+boleta rinde más que un sistema de sonido completo, y ni eso es prioritario
+todavía.
+
 ## M4 · El modelo
 
 Llamada real, presupuesto de tiempo, respaldos, las cinco escenas.
