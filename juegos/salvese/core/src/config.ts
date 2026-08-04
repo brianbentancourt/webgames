@@ -15,13 +15,14 @@ export const LIMITES = {
 
 /** Duración de cada fase, en milisegundos. La fogata es el reloj de `decidir`. */
 export const TIEMPOS = {
-  acamparMs: 20_000,
+  repartoMs: 8_000,
+  acamparMs: 10_000,
   /** Ventana de discusión. Se acorta con la noche (ver `ventanaDecidirMs`). */
-  decidirBaseMs: 180_000,
+  decidirBaseMs: 90_000,
   /** Desde acá la TV muestra dígitos. Antes solo se ve la llama bajar. */
-  decidirDigitosMs: 30_000,
+  decidirDigitosMs: 15_000,
   resolverMs: 7_000,
-  fogonMs: 30_000,
+  fogonMs: 15_000,
   /** Pulso de un gatillo de alerta: objeto, quiebre o perro (08-cliente-tv.md). */
   alertaMs: 1_500,
   /** Presupuesto de la llamada al modelo dentro de la cutscene. Si vence, va el respaldo. */

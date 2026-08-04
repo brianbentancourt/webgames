@@ -247,7 +247,7 @@ export function reducir(estado: EstadoPartida, comando: Comando): Resultado {
         transicion: {
           estado: estadoSiguiente,
           efectos: [
-            { t: 'agendar', enMs: 15_000 },
+            { t: 'agendar', enMs: TIEMPOS.repartoMs },
             { t: 'publicar', a: 'todos' },
           ],
         },
