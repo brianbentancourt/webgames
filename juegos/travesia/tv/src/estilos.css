@@ -56,6 +56,12 @@ body::before {
   justify-content: space-between;
 }
 
+.pantalla-sala {
+  background-image: linear-gradient(rgba(11, 16, 32, 0.4), rgba(11, 16, 32, 0.8)), url("/fondos/amanecer-sierra.jpg");
+  background-size: cover;
+  background-position: center bottom;
+}
+
 .codigo {
   font-size: 12vh;
   letter-spacing: 0.12em;

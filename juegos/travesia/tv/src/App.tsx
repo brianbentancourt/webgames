@@ -57,7 +57,7 @@ export function App() {
 
   if (estado !== 'abierta') {
     return (
-      <main className="pantalla">
+      <main className="pantalla pantalla-sala">
         <p className="al-pie">buscando el servidor…</p>
       </main>
     );
@@ -68,7 +68,7 @@ export function App() {
   }
 
   return (
-    <main className="pantalla">
+    <main className="pantalla pantalla-sala">
       <section style={{ display: 'flex', alignItems: 'center', gap: '3vw' }}>
         <div>
           <p className="al-pie">
