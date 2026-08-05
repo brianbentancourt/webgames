@@ -37,7 +37,8 @@ export function JuegoControl({ vista, mandar }: Props) {
   if (vista.fase === 'epilogo' && vista.miDesenlace) {
     return (
       <main className="pantalla">
-        <p className="titulo">{vista.yo.nombre}</p>
+        <p className="titulo" style={{ marginBottom: 4 }}>{vista.yo.nombre}</p>
+        <p style={{ fontSize: '13px', opacity: 0.65, letterSpacing: '0.02em', textTransform: 'uppercase' }}>Secreto: {vista.yo.objetivo}</p>
         <PantallaEpilogo desenlace={vista.miDesenlace} />
       </main>
     );
@@ -56,7 +57,8 @@ export function JuegoControl({ vista, mandar }: Props) {
   if (accionEsfuerzo && accionEsfuerzo.tipo === 'repartir_esfuerzo' && !accionEsfuerzo.yaReparti) {
     return (
       <main className="pantalla">
-        <p className="titulo">{vista.yo.nombre}</p>
+        <p className="titulo" style={{ marginBottom: 4 }}>{vista.yo.nombre}</p>
+        <p style={{ fontSize: '13px', opacity: 0.65, letterSpacing: '0.02em', textTransform: 'uppercase' }}>Secreto: {vista.yo.objetivo}</p>
         <PantallaRepartirEsfuerzo
           accion={accionEsfuerzo}
           onConfirmar={(ids) => mandar({ t: 'asignar_esfuerzo', a: ids })}
@@ -75,7 +77,8 @@ export function JuegoControl({ vista, mandar }: Props) {
   if (accionPerro && accionPerro.tipo === 'mandar_perro' && !accionPerro.yaDecidio) {
     return (
       <main className="pantalla">
-        <p className="titulo">{vista.yo.nombre}</p>
+        <p className="titulo" style={{ marginBottom: 4 }}>{vista.yo.nombre}</p>
+        <p style={{ fontSize: '13px', opacity: 0.65, letterSpacing: '0.02em', textTransform: 'uppercase' }}>Secreto: {vista.yo.objetivo}</p>
         <PantallaMandarPerro
           onMandar={() => mandar({ t: 'mandar_perro_a_explorar', manda: true })}
           onOmitir={() => mandar({ t: 'mandar_perro_a_explorar', manda: false })}
@@ -93,7 +96,8 @@ export function JuegoControl({ vista, mandar }: Props) {
   ) {
     return (
       <main className="pantalla">
-        <p className="titulo">{vista.yo.nombre}</p>
+        <p className="titulo" style={{ marginBottom: 4 }}>{vista.yo.nombre}</p>
+        <p style={{ fontSize: '13px', opacity: 0.65, letterSpacing: '0.02em', textTransform: 'uppercase' }}>Secreto: {vista.yo.objetivo}</p>
         <div className="resumen-boleta">
           <p>Decisión bloqueada.</p>
           <p className="al-pie">Mirá la TV para ver el resultado.</p>
@@ -113,7 +117,8 @@ export function JuegoControl({ vista, mandar }: Props) {
   if (vista.linea && paso === 0) {
     return (
       <main className="pantalla">
-        <p className="titulo">{vista.yo.nombre}</p>
+        <p className="titulo" style={{ marginBottom: 4 }}>{vista.yo.nombre}</p>
+        <p style={{ fontSize: '13px', opacity: 0.65, letterSpacing: '0.02em', textTransform: 'uppercase' }}>Secreto: {vista.yo.objetivo}</p>
         <p className="linea">{vista.linea}</p>
         <button className="boton-primario" style={{ marginTop: 'auto' }} onClick={() => setPaso(1)}>
           LISTO
@@ -126,7 +131,8 @@ export function JuegoControl({ vista, mandar }: Props) {
   if (accionesSinEsfuerzo.length === 0) {
     return (
       <main className="pantalla">
-        <p className="titulo">{vista.yo.nombre}</p>
+        <p className="titulo" style={{ marginBottom: 4 }}>{vista.yo.nombre}</p>
+        <p style={{ fontSize: '13px', opacity: 0.65, letterSpacing: '0.02em', textTransform: 'uppercase' }}>Secreto: {vista.yo.objetivo}</p>
         <p className="linea">No te toca ninguna acción. Hablá con el grupo.</p>
         {vista.revelacion && (
           <div className="revelacion" style={{ marginTop: 20 }}>
@@ -158,6 +164,8 @@ export function JuegoControl({ vista, mandar }: Props) {
     // Ya completó todo localmente pero no bloqueó (o esperando respuesta de server)
     return (
       <main className="pantalla">
+        <p className="titulo" style={{ marginBottom: 4 }}>{vista.yo.nombre}</p>
+        <p style={{ fontSize: '13px', opacity: 0.65, letterSpacing: '0.02em', textTransform: 'uppercase' }}>Secreto: {vista.yo.objetivo}</p>
         <p className="titulo">Enviando...</p>
       </main>
     );
@@ -193,7 +201,8 @@ export function JuegoControl({ vista, mandar }: Props) {
 
   return (
     <main className="pantalla">
-      <p className="titulo">{vista.yo.nombre}</p>
+      <p className="titulo" style={{ marginBottom: 4 }}>{vista.yo.nombre}</p>
+      <p style={{ fontSize: '13px', opacity: 0.65, letterSpacing: '0.02em', textTransform: 'uppercase', marginBottom: 12 }}>Secreto: {vista.yo.objetivo}</p>
 
       {accionActual.tipo === 'elegir_ruta' && (
         <PantallaRuta
@@ -209,7 +218,7 @@ export function JuegoControl({ vista, mandar }: Props) {
         <PantallaBloquear onSiguiente={(v) => handleSiguiente('bloquear', v)} />
       )}
       {accionActual.tipo === 'responder_trato' && (
-        <PantallaTrato onSiguiente={(v) => handleSiguiente('trato', v)} />
+        <PantallaTrato onSiguiente={(v) => handleSiguiente('trato', v)} trato={vista.trato} />
       )}
       {accionActual.tipo === 'entregar_objeto' && (
         <PantallaEntregarObjeto

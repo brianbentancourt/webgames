@@ -89,7 +89,7 @@ export type Gatillo =
  * opciones, dicta qué decir en voz alta.
  */
 export interface VistaJugador {
-  yo: { id: JugadorId; nombre: string; rol: Rol; llano: string };
+  yo: { id: JugadorId; nombre: string; rol: Rol; llano: string; objetivo: string };
   fase: Fase;
   noche: number;
   /** Texto para decir en voz alta. Si viene, va en lugar de las opciones. */
@@ -633,6 +633,7 @@ export function proyectarJugador(
       nombre: yo.nombre,
       rol: yo.rol,
       llano: FICHAS[yo.rol].llano,
+      objetivo: OBJETIVOS_TEXTO[estado.tablero]?.[yo.objetivo] ?? 'Un objetivo personal.',
     },
     fase: estado.fase,
     noche: estado.noche,

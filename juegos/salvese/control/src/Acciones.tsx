@@ -211,12 +211,21 @@ export function PantallaBloquear({ onSiguiente }: BaseProps) {
   );
 }
 
-export function PantallaTrato({ onSiguiente }: BaseProps) {
+export function PantallaTrato({
+  trato,
+  onSiguiente,
+}: BaseProps & { trato?: { texto: string; costo: string } }) {
   return (
     <div className="opciones" style={{ marginTop: 'auto', marginBottom: 'auto' }}>
       <p className="titulo" style={{ color: 'var(--brasa)' }}>UN TRATO</p>
-      <p className="linea">¿Aceptás el trato?</p>
-      <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+      <p className="linea" style={{ marginBottom: 12 }}>¿Aceptás el trato?</p>
+      {trato && (
+        <div style={{ marginBottom: 20 }}>
+          <p className="opcion-detalle" style={{ fontSize: 18, color: 'var(--tinta)' }}>{trato.texto}</p>
+          <p className="opcion-detalle" style={{ marginTop: 8, color: 'var(--brasa)' }}>Costo: {trato.costo}</p>
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: 10 }}>
         <button className="boton-primario" onClick={() => onSiguiente(true)}>Sí</button>
         <button className="secundario" onClick={() => onSiguiente(false)}>No</button>
       </div>
