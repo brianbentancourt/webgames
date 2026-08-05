@@ -125,10 +125,25 @@ export function JuegoTV({ vista }: { vista: VistaTV }) {
 
       {vista.fase === 'decidir' && vista.candidatos.length > 0 && (
         <div className="panel-candidatos">
+          {/*
+            Lo que trajo el perro (A2) se marca sobre el tramo, no en un cartel
+            aparte: la información aparece pegada a la decisión que modifica, y
+            es pública porque el perro es el único dato público del juego (D10).
+          */}
           {vista.candidatos.map((c) => (
-            <div key={c.id} className="candidato-tarjeta">
+            <div
+              key={c.id}
+              className={
+                vista.perro.tramoRevelado === c.nombre
+                  ? 'candidato-tarjeta candidato-marcado'
+                  : 'candidato-tarjeta'
+              }
+            >
               <h3 className="candidato-nombre">{c.nombre}</h3>
               <p className="candidato-pista">{c.pista}</p>
+              {vista.perro.tramoRevelado === c.nombre && (
+                <p className="candidato-perro">el perro no quiso pasar por acá</p>
+              )}
             </div>
           ))}
         </div>

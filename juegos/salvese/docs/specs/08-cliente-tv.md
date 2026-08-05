@@ -79,6 +79,20 @@ que para entonces ya no existe.
 objetivos caen encima de la fogata con 3+ jugadores (era el bug de layout de
 M3.5), y con la revelación adentro el panel es más alto todavía.
 
+## El perro que sale a explorar
+
+Mientras explora sigue `presente` —el riesgo recién se resuelve al cerrar la
+noche— pero **no está junto al fuego**. Con `vista.perro.explorando` la silueta se
+dibuja como ausencia (`.perro-explorando`: muy tenue, en gris y sin meneo de cola)
+y el nombre pasa a decir *"salió"*. Seguir mostrándolo echado en su postura normal
+sería mentir sobre lo único público que tiene el juego (`D10`).
+
+Cuando vuelve, `vista.perro.tramoRevelado` trae el nombre del tramo más duro de
+la noche siguiente. **Se marca sobre la tarjeta del tramo** en `panel-candidatos`
+(`.candidato-marcado`), no en un cartel aparte: la información queda pegada a la
+decisión que modifica, que es dónde sirve. Es la única cosa que marca una tarjeta,
+así que no compite con nada más en pantalla.
+
 ## Los gatillos
 
 La TV se entera de que tiene que animar por `vista.gatillos`, no comparando estados.
@@ -91,8 +105,35 @@ la TV que vuelve de un corte **aparece en el estado posterior sin reproducir nad
 ## El perro
 
 Segundo foco de vida de la escena: duerme junto al fuego y se levanta cuando algo
-viene. Es el único dato público del juego, así que su animación es la única que
-puede interrumpir la charla sin ser una cutscene.
+viene. Es el único dato público del juego (`D10`), así que su animación es la
+única que puede interrumpir la charla sin ser una cutscene.
+
+Cuatro alertas, todas nivel **ambiente** — postura y tinte, cero texto. Escribir
+"gruñe" en la pantalla sería leer, no mirar de reojo, y rompería la regla de más
+arriba: si algo hay que leer para entender qué está pasando, está mal resuelto.
+
+| Alerta | Postura | Tinte |
+|---|---|---|
+| `ninguna` | echado junto al fuego, una oreja caída | ninguno |
+| `inquieto` | de pie, las dos orejas arriba, sigue mirando al grupo | ninguno |
+| `grune` | de pie, girado hacia afuera (figura espejada) | brasa suave |
+| `no_avanza` | plantado, patas más firmes, cola quieta y en alto | brasa fuerte |
+
+Cada alerta suma señales sobre la anterior en vez de reemplazarlas —`no_avanza`
+lleva todo lo de `grune` más postura y color propios—, así que la progresión se
+lee como escalera: que `no_avanza` es peor que `grune` se entiende solo, sin que
+nadie lo explique en la mesa.
+
+El tinte sale de `--brasa` y sólo lo llevan `grune` y `no_avanza`: es el único
+color cálido de toda la pantalla, y si tiñera las cuatro alertas dejaría de
+servir de guía para el ojo. `ninguna` e `inquieto` se distinguen sólo por
+postura, así que la brasa queda reservada para cuando el perro de verdad advierte
+algo, cada vez más fuerte.
+
+Con `prefers-reduced-motion` las cuatro se siguen leyendo igual: la diferencia
+vive en la forma y el color de cada estado, no en el movimiento entre ellos. La
+reducción sólo saca el paso suavizado al cambiar de alerta y la respiración/cola
+de ambiente — nunca la pose ni el tinte final.
 
 ## Imágenes
 

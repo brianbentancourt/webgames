@@ -321,6 +321,8 @@ body::before {
 .silueta-perro-figura {
   display: flex;
   align-items: flex-end;
+  transform-origin: bottom center;
+  transition: transform 0.6s steps(4, end);
 }
 
 .silueta-perro-cuerpo {
@@ -329,7 +331,7 @@ body::before {
   border-radius: 55% 45% 40% 35% / 75% 75% 45% 45%;
   background-image:
     radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.35), transparent 55%),
-    linear-gradient(150deg, color-mix(in srgb, #a38965 100%, white 20%) 0%, #a38965 45%, color-mix(in srgb, #a38965 100%, black 30%) 100%);
+    linear-gradient(150deg, color-mix(in srgb, var(--color-perro, #a38965) 100%, white 20%) 0%, var(--color-perro, #a38965) 45%, color-mix(in srgb, var(--color-perro, #a38965) 100%, black 30%) 100%);
   position: relative;
 }
 
@@ -341,7 +343,7 @@ body::before {
   left: -0.6vh;
   width: 1.4vh;
   height: 0.6vh;
-  background: color-mix(in srgb, #a38965 100%, black 30%);
+  background: color-mix(in srgb, var(--color-perro, #a38965) 100%, black 30%);
   border-radius: 50% 10% 10% 50%;
   transform-origin: right center;
   transform: rotate(45deg);
@@ -361,9 +363,9 @@ body::before {
   left: 0.6vh;
   width: 0.6vh;
   height: 1.2vh;
-  background: color-mix(in srgb, #a38965 100%, black 40%);
+  background: color-mix(in srgb, var(--color-perro, #a38965) 100%, black 40%);
   border-radius: 0 0 0.3vh 0.3vh;
-  box-shadow: 2vh 0 0 color-mix(in srgb, #a38965 100%, black 20%);
+  box-shadow: 2vh 0 0 color-mix(in srgb, var(--color-perro, #a38965) 100%, black 20%);
 }
 
 .silueta-perro-cabeza {
@@ -375,7 +377,7 @@ body::before {
   position: relative;
   background-image:
     radial-gradient(circle at 35% 25%, rgba(255, 255, 255, 0.35), transparent 55%),
-    linear-gradient(150deg, color-mix(in srgb, #a38965 100%, white 20%) 0%, #a38965 45%, color-mix(in srgb, #a38965 100%, black 30%) 100%);
+    linear-gradient(150deg, color-mix(in srgb, var(--color-perro, #a38965) 100%, white 20%) 0%, var(--color-perro, #a38965) 45%, color-mix(in srgb, var(--color-perro, #a38965) 100%, black 30%) 100%);
 }
 
 .silueta-perro-cabeza::after {
@@ -386,7 +388,106 @@ body::before {
   width: 0.7vh;
   height: 1vh;
   clip-path: polygon(50% 0%, 100% 100%, 10% 100%);
-  background: color-mix(in srgb, #a38965 100%, black 30%);
+  background: color-mix(in srgb, var(--color-perro, #a38965) 100%, black 30%);
+  transform-origin: bottom center;
+  transform: rotate(45deg) scaleY(0.85);
+  transition: transform 0.6s steps(4, end);
+}
+
+/*
+ * Las cuatro alertas del perro (D10, único dato público del juego): postura y
+ * tinte, cero texto — se mira de reojo, no se lee (08-cliente-tv.md § El
+ * perro). Nivel "ambiente": permanente y bajo, no compite con la cutscene de
+ * resolución.
+ *
+ *   ninguna    → echado junto al fuego, una oreja caída, color natural
+ *   inquieto   → de pie, las dos orejas arriba, sigue mirando al grupo
+ *   grune      → de pie, girado hacia afuera (figura espejada), tinte brasa suave
+ *   no_avanza  → plantado, patas más firmes, cola quieta y en alto, tinte brasa fuerte
+ *
+ * Cada nivel suma señales sobre el anterior en vez de reemplazarlas — es lo
+ * que hace que la escalera se lea sola, sin que nadie explique qué significa
+ * cada alerta.
+ */
+
+/* Segunda oreja: sólo se levanta de pie. Con las dos orejas arriba la cabeza
+   se lee "atenta"; con una sola caída se lee "perro tranquilo". */
+.silueta-perro-cabeza::before {
+  content: '';
+  position: absolute;
+  top: -0.55vh;
+  left: 0.3vh;
+  width: 0.6vh;
+  height: 0.9vh;
+  clip-path: polygon(50% 0%, 95% 100%, 15% 100%);
+  background: color-mix(in srgb, var(--color-perro, #a38965) 100%, black 20%);
+  transform-origin: bottom center;
+  transform: scaleY(0);
+  transition: transform 0.6s steps(4, end);
+}
+
+.silueta-perro.alerta-inquieto .silueta-perro-cabeza::after,
+.silueta-perro.alerta-grune .silueta-perro-cabeza::after,
+.silueta-perro.alerta-no_avanza .silueta-perro-cabeza::after {
+  transform: rotate(-8deg) scaleY(1);
+}
+
+.silueta-perro.alerta-inquieto .silueta-perro-cabeza::before,
+.silueta-perro.alerta-grune .silueta-perro-cabeza::before,
+.silueta-perro.alerta-no_avanza .silueta-perro-cabeza::before {
+  transform: scaleY(1);
+}
+
+/* Postura: echado y bajo en reposo; de pie en las otras tres. */
+.silueta-perro.alerta-ninguna .silueta-perro-figura {
+  transform: scaleY(0.72) translateY(0.65vh);
+}
+
+.silueta-perro.alerta-inquieto .silueta-perro-figura {
+  transform: scaleY(1) translateY(-0.3vh);
+}
+
+/* Girado hacia afuera: se espeja la figura entera (cabeza, cola y patas se
+   van al otro lado) — la lectura más barata de "el perro se dio vuelta",
+   sin marcado nuevo. */
+.silueta-perro.alerta-grune .silueta-perro-figura {
+  transform: scaleY(1) translateY(-0.3vh) scaleX(-1);
+}
+
+.silueta-perro.alerta-no_avanza .silueta-perro-figura {
+  transform: scaleY(1.06) translateY(-0.45vh) scaleX(-1);
+}
+
+/* Tinte de brasa: sólo grune y no_avanza lo llevan, y creciente. Se raciona
+   porque la brasa es el único color cálido de toda la pantalla — si todo
+   brilla, nada brilla. */
+.silueta-perro.alerta-grune {
+  --color-perro: color-mix(in srgb, #a38965 75%, var(--brasa) 25%);
+}
+
+.silueta-perro.alerta-no_avanza {
+  --color-perro: color-mix(in srgb, #a38965 40%, var(--brasa) 60%);
+}
+
+/* Plantado: patas más gruesas y más separadas, cuerpo un poco más lleno —
+   la silueta pesa más porque es la alerta más alarmante. */
+.silueta-perro.alerta-no_avanza .silueta-perro-cuerpo {
+  height: 2.8vh;
+}
+
+.silueta-perro.alerta-no_avanza .silueta-perro-cuerpo::after {
+  width: 0.75vh;
+  height: 1.35vh;
+  box-shadow: 2.5vh 0 0 color-mix(in srgb, var(--color-perro, #a38965) 100%, black 20%);
+}
+
+/* Cola quieta y en alto en vez de mover-cola: un perro que no avanza no
+   menea la cola. Es la única alerta que corta la animación de ambiente, y el
+   corte en sí es parte de la lectura (algo tan atento que ni la cola se
+   mueve), no una excepción a la regla de "ambiente permanente". */
+.silueta-perro.alerta-no_avanza .silueta-perro-cuerpo::before {
+  animation: none;
+  transform: rotate(80deg);
 }
 
 .estado-quebrado {
@@ -512,6 +613,32 @@ body::before {
   max-width: 30ch;
   clip-path: polygon(3% 2%, 98% 4%, 95% 96%, 1% 98%);
   transform: rotate(1deg);
+}
+
+/* Lo que trajo el perro de explorar (A2): va sobre el tramo, no en un cartel
+   aparte. Es lo único que marca una tarjeta, así que no compite con nada. */
+.candidato-marcado {
+  background: rgba(255, 122, 60, 0.16);
+  border-left: 0.5vh solid var(--brasa);
+}
+
+.candidato-perro {
+  margin-top: 0.6vh;
+  font-size: 1.7vh;
+  color: var(--brasa);
+  opacity: 0.9;
+}
+
+/* El perro salió a explorar: sigue `presente` pero no está junto al fuego.
+   Se dibuja como ausencia —muy tenue y quieto— en vez de en su postura
+   normal, que sería mentir sobre el único dato público del juego (D10). */
+.perro-explorando {
+  opacity: 0.28;
+  filter: grayscale(1);
+}
+
+.perro-explorando .silueta-perro-cuerpo::before {
+  animation: none;
 }
 
 .candidato-nombre {
@@ -772,6 +899,16 @@ body::before {
 
 @media (prefers-reduced-motion: reduce) {
   .luz-fogata {
+    transition: none;
+  }
+
+  /* Las cuatro alertas del perro se distinguen por postura y tinte, no por
+     movimiento (ver comentario junto a .silueta-perro-figura): apagar la
+     transición sólo saca el paso suavizado entre estados, la pose final de
+     cada alerta sigue siendo la misma. */
+  .silueta-perro-figura,
+  .silueta-perro-cabeza::after,
+  .silueta-perro-cabeza::before {
     transition: none;
   }
 
