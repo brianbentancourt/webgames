@@ -615,6 +615,11 @@ body::before {
     background: rgba(0, 0, 0, 0.55);
     opacity: 1;
   }
+  100% {
+    background: rgba(0, 0, 0, 0);
+    opacity: 0;
+  }
+}
 
 .cronica-texto {
   font-size: 3vh;
