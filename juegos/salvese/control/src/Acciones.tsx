@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { Accion } from '@salvese/core';
 
 interface BaseProps {
@@ -33,22 +34,58 @@ export function PantallaRaciones({ accion, onSiguiente }: BaseProps & { accion: 
   );
 }
 
-export function PantallaEsfuerzo({ accion, onSiguiente }: BaseProps & { accion: Extract<Accion, { tipo: 'elegir_esfuerzo' }> }) {
-  // Para esfuerzo pueden elegirse múltiples hasta el max, pero simplificando
-  // el usuario podría elegir a uno o pasar. Como el spec dice "rápido", podemos
-  // mostrar la lista y dejar que elija uno o "Ninguno".
-  // Idealmente mantendría estado local, pero para no sobrecargar, pasamos un array.
+/**
+ * El reparto del trabajo pesado (D19). Selección múltiple hasta `max`, con
+ * confirmar: independiente de la boleta, así que puede aparecer aunque ya se
+ * haya bloqueado ruta y raciones (ver `JuegoControl.tsx`).
+ *
+ * Los que no se pueden elegir se muestran igual, deshabilitados con su
+ * `motivo`: que se vea por qué no se puede es parte de la conversación, no
+ * algo para esconder.
+ */
+export function PantallaRepartirEsfuerzo({
+  accion,
+  onConfirmar,
+}: {
+  accion: Extract<Accion, { tipo: 'repartir_esfuerzo' }>;
+  onConfirmar: (ids: string[]) => void;
+}) {
+  // Arranca en lo que ya está asignado del lado del servidor, no vacío: si el
+  // celular se recargó a mitad de la noche, esta pantalla tiene que volver
+  // mostrando lo que ya se repartió y no una selección en blanco (D4).
+  const [seleccion, setSeleccion] = useState<string[]>(accion.yaAsignado);
+
+  const alternar = (id: string) => {
+    setSeleccion((actual) => {
+      if (actual.includes(id)) return actual.filter((x) => x !== id);
+      if (actual.length >= accion.max) return actual;
+      return [...actual, id];
+    });
+  };
+
+  const esVoluntario = accion.modo === 'voluntario';
+
   return (
     <div className="opciones">
-      <p className="titulo">EL ESFUERZO</p>
-      <p className="linea" style={{ marginBottom: 12 }}>¿Quién gasta vigor para que la caravana avance más rápido esta noche?</p>
+      <p className="titulo">EL TRABAJO PESADO</p>
+      <p className="linea" style={{ marginBottom: 12 }}>
+        {esVoluntario
+          ? '¿Te ofrecés al trabajo pesado esta noche? Gastás vigor, la caravana avanza más.'
+          : `¿A quién mandás al trabajo pesado esta noche? Hasta ${accion.max}.`}
+      </p>
       {accion.opciones.map((o) => (
-        <button key={o.id} className="boton-opcion" onClick={() => onSiguiente([o.id])}>
-          <span className="opcion-nombre">{o.nombre}</span>
+        <button
+          key={o.id}
+          className={`boton-opcion ${seleccion.includes(o.id) ? 'seleccionado' : ''}`}
+          disabled={!o.disponible}
+          onClick={() => alternar(o.id)}
+        >
+          <span className="opcion-nombre">{esVoluntario ? 'Me ofrezco' : o.nombre}</span>
+          {!o.disponible && o.motivo && <span className="opcion-detalle">{o.motivo}</span>}
         </button>
       ))}
-      <button className="boton-opcion" onClick={() => onSiguiente([])}>
-        <span className="opcion-nombre">Nadie</span>
+      <button className="boton-primario" style={{ marginTop: 20 }} onClick={() => onConfirmar(seleccion)}>
+        {accion.yaReparti ? 'CAMBIAR' : 'CONFIRMAR'}
       </button>
     </div>
   );

@@ -532,8 +532,15 @@ body::before {
   align-items: center;
   justify-content: center;
   gap: 1.4vh;
-  padding: 0 10vw;
+  padding: var(--overscan) 8vw;
   text-align: center;
+  /*
+    Fondo propio, como el del fogón. Sin esto las tarjetas de objetivos caen
+    literalmente encima de la fogata con 3+ jugadores (roadmap M3.5), y ahora
+    que el epílogo también muestra la revelación de la última noche el panel
+    es más alto todavía.
+  */
+  background: rgba(0, 0, 0, 0.6);
 }
 
 .espera-texto {
@@ -587,6 +594,142 @@ body::before {
 .objetivo-texto {
   font-size: 1.8vh;
   opacity: 0.85;
+}
+
+/* Fogón: revelación de boletas (D18). Overlay a pantalla completa, sin
+   scroll: dos columnas (ruta, raciones) más el esfuerzo abajo, la opción
+   ganadora marcada con la brasa. */
+.panel-fogon {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2.4vh;
+  padding: var(--overscan) 8vw;
+  background: rgba(0, 0, 0, 0.6);
+  text-align: center;
+}
+
+.fogon-titulo {
+  font-size: 3.4vh;
+  color: var(--brasa);
+}
+
+.fogon-columnas {
+  display: flex;
+  gap: 5vw;
+  width: 100%;
+  justify-content: center;
+}
+
+.fogon-columna {
+  flex: 1;
+  max-width: 42ch;
+  text-align: left;
+}
+
+.fogon-encabezado {
+  font-size: 1.9vh;
+  opacity: 0.65;
+  letter-spacing: 0.1em;
+  margin-bottom: 1vh;
+}
+
+.fogon-lista {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 1vh;
+}
+
+.fogon-fila {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3vh;
+  padding: 1vh 1.2vw;
+  background: rgba(0, 0, 0, 0.35);
+  border-left: 0.4vh solid rgba(232, 226, 214, 0.25);
+}
+
+.fogon-fila-gano {
+  border-left: 0.4vh solid var(--brasa);
+  background: rgba(255, 122, 60, 0.14);
+}
+
+.fogon-opcion {
+  font-size: 2.4vh;
+  text-transform: capitalize;
+}
+
+.fogon-votantes {
+  font-size: 1.8vh;
+  opacity: 0.8;
+}
+
+.fogon-esfuerzo {
+  max-width: 64ch;
+}
+
+.fogon-esfuerzo-texto {
+  font-size: 2.2vh;
+  opacity: 0.9;
+}
+
+/*
+  El bloque de revelación se usa en el fogón y, más chico, en el epílogo: la
+  última noche no pasa por el fogón y si no se muestra acá no se muestra nunca.
+*/
+.revelacion {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2.4vh;
+  width: 100%;
+}
+
+.revelacion-compacta {
+  gap: 1.2vh;
+}
+
+.revelacion-compacta .fogon-columnas {
+  gap: 3vw;
+}
+
+.revelacion-compacta .fogon-fila {
+  padding: 0.6vh 1vw;
+  gap: 0.1vh;
+}
+
+.revelacion-compacta .fogon-lista {
+  gap: 0.6vh;
+}
+
+.revelacion-compacta .fogon-opcion {
+  font-size: 1.9vh;
+}
+
+.revelacion-compacta .fogon-votantes {
+  font-size: 1.5vh;
+}
+
+.revelacion-compacta .fogon-esfuerzo-texto {
+  font-size: 1.8vh;
+}
+
+.epilogo-revelacion {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.8vh;
+}
+
+.epilogo-subtitulo {
+  font-size: 2vh;
+  opacity: 0.65;
+  letter-spacing: 0.1em;
 }
 
 /* Resolución: única cutscene dramática de la noche (D4 § tres niveles). */

@@ -3,7 +3,7 @@ import type { VistaJugador } from '@salvese/core';
 import {
   PantallaRuta,
   PantallaRaciones,
-  PantallaEsfuerzo,
+  PantallaRepartirEsfuerzo,
   PantallaBloquear,
   PantallaTrato,
   PantallaEntregarObjeto,
@@ -18,14 +18,38 @@ export function JuegoControl({ vista, mandar }: Props) {
   const [paso, setPaso] = useState(0);
   const [boleta, setBoleta] = useState<any>({});
 
-  // Resetear paso si cambia la fase
+  // Resetear paso si cambia la fase o la noche
   useEffect(() => {
     setPaso(0);
     setBoleta({});
   }, [vista.fase, vista.noche]);
 
-  // Si ya tiene una boleta confirmada desde el servidor, mostramos el resumen.
-  if (vista.boleta) {
+  // El reparto del esfuerzo es independiente de la boleta (D19): no depende
+  // de haber bloqueado ruta y raciones, ni al revés. Por eso se resuelve acá,
+  // antes que el wizard de la boleta y con su propia pantalla, en vez de ser
+  // un paso más del array `acciones`.
+  //
+  // Si ya repartió, la pantalla no se fuerza más: eso lo dice el servidor con
+  // `yaReparti`, no un `useState` local. Con estado local se perdía al recargar
+  // el celular y el Capataz volvía a ver la pantalla de reparto a mitad de la
+  // noche, pudiendo pisar sin querer lo que ya había decidido.
+  const accionEsfuerzo = vista.acciones.find((a) => a.tipo === 'repartir_esfuerzo');
+  if (accionEsfuerzo && accionEsfuerzo.tipo === 'repartir_esfuerzo' && !accionEsfuerzo.yaReparti) {
+    return (
+      <main className="pantalla">
+        <p className="titulo">{vista.yo.nombre}</p>
+        <PantallaRepartirEsfuerzo
+          accion={accionEsfuerzo}
+          onConfirmar={(ids) => mandar({ t: 'asignar_esfuerzo', a: ids })}
+        />
+      </main>
+    );
+  }
+
+  // Si ya tiene una boleta confirmada desde el servidor y no queda pendiente
+  // más que el reparto del esfuerzo (ya confirmado arriba), mostramos el
+  // resumen.
+  if (vista.boleta && vista.acciones.every((a) => a.tipo === 'repartir_esfuerzo')) {
     return (
       <main className="pantalla">
         <p className="titulo">{vista.yo.nombre}</p>
@@ -36,6 +60,10 @@ export function JuegoControl({ vista, mandar }: Props) {
       </main>
     );
   }
+
+  // El reparto del esfuerzo ya se resolvió arriba (con su propia pantalla, si
+  // correspondía): de acá para abajo el wizard trabaja solo con el resto.
+  const accionesSinEsfuerzo = vista.acciones.filter((a) => a.tipo !== 'repartir_esfuerzo');
 
   // Si hay una línea del tutorial, obligar a decirla y mostrar un botón de Continuar
   if (vista.linea && paso === 0) {
@@ -51,7 +79,7 @@ export function JuegoControl({ vista, mandar }: Props) {
   }
 
   // Si no hay acciones pendientes para él, mostrar "esperá / hablá"
-  if (vista.acciones.length === 0) {
+  if (accionesSinEsfuerzo.length === 0) {
     return (
       <main className="pantalla">
         <p className="titulo">{vista.yo.nombre}</p>
@@ -80,7 +108,7 @@ export function JuegoControl({ vista, mandar }: Props) {
 
   // Flujo normal de acciones (wizard)
   const indiceAccion = vista.linea ? paso - 1 : paso;
-  const accionActual = vista.acciones[indiceAccion];
+  const accionActual = accionesSinEsfuerzo[indiceAccion];
 
   if (!accionActual) {
     // Ya completó todo localmente pero no bloqueó (o esperando respuesta de server)
@@ -106,11 +134,10 @@ export function JuegoControl({ vista, mandar }: Props) {
       mandar({ t: 'entregar_objeto', objeto: accionActual.objeto, a: valor });
       setPaso(paso + 1);
     } else if (accionActual.tipo === 'bloquear') {
-      mandar({ 
-        t: 'elegir', 
-        ruta: nuevaBoleta.ruta, 
-        raciones: nuevaBoleta.raciones, 
-        esfuerzo: nuevaBoleta.esfuerzo 
+      mandar({
+        t: 'elegir',
+        ruta: nuevaBoleta.ruta,
+        raciones: nuevaBoleta.raciones,
       });
       mandar({ t: 'bloquear' });
       setPaso(paso + 1);
@@ -129,9 +156,6 @@ export function JuegoControl({ vista, mandar }: Props) {
       )}
       {accionActual.tipo === 'elegir_raciones' && (
         <PantallaRaciones accion={accionActual as any} onSiguiente={(v) => handleSiguiente('raciones', v)} />
-      )}
-      {accionActual.tipo === 'elegir_esfuerzo' && (
-        <PantallaEsfuerzo accion={accionActual as any} onSiguiente={(v) => handleSiguiente('esfuerzo', v)} />
       )}
       {accionActual.tipo === 'bloquear' && (
         <PantallaBloquear onSiguiente={(v) => handleSiguiente('bloquear', v)} />

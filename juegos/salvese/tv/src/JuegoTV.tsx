@@ -1,7 +1,55 @@
-import type { VistaTV } from '@salvese/core';
+import type { VistaTV, RevelacionBoletas } from '@salvese/core';
 import { ventanaDecidirMs } from '@salvese/core';
 import { Fogata } from './Fogata.js';
 import { Caravana } from './Caravana.js';
+
+/**
+ * Quién votó qué, con nombre (D18). Se usa en el fogón y también en el epílogo:
+ * cuando la partida termina, la máquina va de `resolver` directo a `epilogo`
+ * salteando `fogon`, así que sin esto las boletas de la última noche —la 5, la
+ * que el Capataz decide solo— no las vería nadie nunca.
+ */
+function Revelacion({ rev, compacto = false }: { rev: RevelacionBoletas; compacto?: boolean }) {
+  return (
+    <div className={compacto ? 'revelacion revelacion-compacta' : 'revelacion'}>
+      <div className="fogon-columnas">
+        <div className="fogon-columna">
+          <h3 className="fogon-encabezado">LA RUTA</h3>
+          <ul className="fogon-lista">
+            {rev.ruta.map((r) => (
+              <li key={r.nombre} className={r.gano ? 'fogon-fila fogon-fila-gano' : 'fogon-fila'}>
+                <span className="fogon-opcion">{r.nombre}</span>
+                <span className="fogon-votantes">
+                  {r.votantes.length > 0 ? r.votantes.join(' · ') : 'nadie votó esto'}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div className="fogon-columna">
+          <h3 className="fogon-encabezado">RACIONES</h3>
+          <ul className="fogon-lista">
+            {rev.raciones.map((r) => (
+              <li key={r.nivel} className={r.gano ? 'fogon-fila fogon-fila-gano' : 'fogon-fila'}>
+                <span className="fogon-opcion">{r.nivel}</span>
+                <span className="fogon-votantes">
+                  {r.votantes.length > 0 ? r.votantes.join(' · ') : 'nadie votó esto'}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+      <div className="fogon-esfuerzo">
+        <h3 className="fogon-encabezado">EL TRABAJO PESADO</h3>
+        <p className="fogon-esfuerzo-texto">
+          {rev.esfuerzo.length > 0 ? rev.esfuerzo.join(' · ') : 'No fue nadie.'}
+          {rev.repartio ? ` — los mandó ${rev.repartio}` : ''}
+        </p>
+      </div>
+    </div>
+  );
+}
 
 export function JuegoTV({ vista }: { vista: VistaTV }) {
   const { paleta } = vista.tablero;
@@ -100,6 +148,13 @@ export function JuegoTV({ vista }: { vista: VistaTV }) {
         </div>
       )}
 
+      {vista.fase === 'fogon' && vista.revelacion && (
+        <div className="panel-fogon">
+          <h2 className="fogon-titulo">Noche {vista.revelacion.noche}: lo que pasó</h2>
+          <Revelacion rev={vista.revelacion} />
+        </div>
+      )}
+
       {vista.fase === 'epilogo' && (
         <div className="panel-epilogo">
           {vista.desenlace ? (
@@ -111,6 +166,17 @@ export function JuegoTV({ vista }: { vista: VistaTV }) {
                 {vista.desenlace.perroLlego ? 'El perro llegó con ellos.' : 'El perro se perdió en el camino.'}
               </p>
               {vista.ultimaCronica && <p className="cronica-texto">{vista.ultimaCronica.relato}</p>}
+              {/*
+                La última noche no pasa por el fogón —la máquina va de `resolver`
+                directo a `epilogo`— así que su revelación se muestra acá o no se
+                muestra nunca. Es justo la boleta más jugosa de la partida.
+              */}
+              {vista.revelacion && (
+                <div className="epilogo-revelacion">
+                  <h3 className="epilogo-subtitulo">La última noche</h3>
+                  <Revelacion rev={vista.revelacion} compacto />
+                </div>
+              )}
               <ul className="epilogo-objetivos">
                 {vista.desenlace.objetivos.map((o) => (
                   <li key={o.jugador} className={o.cumplido ? 'objetivo-cumplido' : 'objetivo-fallado'}>

@@ -41,12 +41,13 @@ reconexión a mitad de partida, y una travesía completa hasta el epílogo.
 
 - `JuegoControl.tsx` orquesta el wizard de una pantalla por acción: revelación de
   rol → línea de tutorial (noche 1) → `elegir_ruta` / `elegir_raciones` /
-  `elegir_esfuerzo` / `entregar_objeto` / `responder_trato` → `bloquear`, con
-  reinicio automático al cambiar `noche`/`fase`.
+  `entregar_objeto` / `responder_trato` → `bloquear`, con reinicio automático al
+  cambiar `noche`/`fase`. El reparto del esfuerzo (`repartir_esfuerzo`, D19) se
+  resuelve aparte, antes que el wizard: es independiente de la boleta.
 - `Acciones.tsx` tiene un componente por tipo de `Accion` del protocolo, incluido
   `PantallaEntregarObjeto` (antes faltaba: un jugador con objeto en `acampar` o
   `fogon` quedaba en una pantalla en blanco, sin forma de avanzar).
-- `elegir_esfuerzo.opciones` y `entregar_objeto.candidatos` llevan `{id, nombre}`
+- `repartir_esfuerzo.opciones` y `entregar_objeto.candidatos` llevan `{id, nombre}`
   en vez de solo el id (`vistas.ts`): la vista es autocontenida, el cliente no
   reconstruye un mapa id→nombre a partir de mensajes previos de la sala.
 - La votación de tablero tiene pantalla propia en el lobby de `control/App.tsx`
@@ -163,6 +164,60 @@ unificarlo, pero es una pasada de arte más grande, no un bug), y sonido —no
 hay spec de audio y no es MVP; si se suma algo, un solo pulso al bloquear la
 boleta rinde más que un sistema de sonido completo, y ni eso es prioritario
 todavía.
+
+## M3.6 · Cirugías 1 y 2 — que hablar cueste algo
+
+Fase 1 de [`plan-diversion.md`](../plan-diversion.md). El diagnóstico completo
+está ahí; en una línea: es un juego que se vende como "la conversación es el
+juego" y en el que hablar no tenía ninguna consecuencia mecánica.
+
+- **Las boletas se revelan en el fogón** (D18). Secretas durante, públicas
+  después, con nombre. De paso le da contenido propio al fogón, que era la peor
+  falla de M3.5, sin escribir una línea de contenido nuevo.
+- **El Capataz reparte el esfuerzo** (D19), no se vota. Arregla además un bug
+  del conteo viejo: no contaba votos, ordenaba a los viajeros con vigor > 0 por
+  votos y se llevaba los tres primeros —`ordenados.slice(0, 3)`— tuvieran votos
+  o no. Con 3 o 4 sanos iban todos al trabajo pesado siempre, aunque nadie
+  hubiera votado a nadie.
+
+**Criterio de salida**: en un playtest real alguien dice *"¡vos dijiste que…!"*.
+Todavía **no verificado con gente** — lo de abajo es lo que sí se verificó.
+
+**Lo que encontró revisar la implementación, no escribirla**:
+
+- **La noche 1 se colgaba 90 segundos con 4+ jugadores.** El atajo de "todos
+  bloquearon" esperaba a que el Capataz repartiera, pero en la noche 1 no se
+  reparte (D8) y nunca iba a repartir: la mesa bloqueaba en veinte segundos y se
+  quedaba mirando el teléfono hasta que vencía la ventana. Justo el minuto del
+  que depende que la mesa se enganche. Ahora la condición sale de
+  `hayRepartoDeEsfuerzo()`, el mismo helper que usa la proyección para decidir
+  si ofrece la acción: por construcción no se pueden desincronizar otra vez.
+- **La revelación de la última noche no la veía nadie.** Se computaba, se
+  guardaba y se mandaba en la vista, pero la TV solo la pintaba en `fogon` — y
+  la última noche va de `resolver` directo a `epilogo`. Era la boleta más jugosa
+  de la partida (`capataz_solo`) y se perdía. El epílogo ahora la pinta.
+- **El "ya repartí" vivía en el cliente**, en un `useState`. Se perdía al
+  recargar el celular y el Capataz volvía a ver la pantalla de reparto a mitad
+  de la noche, pudiendo pisar lo que ya había decidido. Contradecía D4 de
+  frente. Ahora sale del servidor (`yaReparti` / `yaAsignado`), y `EstadoNoche`
+  lleva `esfuerzoRespondieron` porque repartir "a nadie" y no haber repartido
+  son los dos una lista vacía.
+- **El playtest e2e corría con 3 jugadores**, y con 3 no hay Capataz en
+  `REPARTO`: el reparto del Capataz —el corazón de D19— no se ejercitaba nunca,
+  solo el modo voluntario. Ahora corre con **5**, que además es el punto óptimo
+  de diseño, y verifica `repartioCapataz`, `vioRevelacion`, la revelación del
+  epílogo, y **falla** si la revelación se filtra en cualquier fase que no sea
+  `fogon` o `epilogo`.
+
+Es el mismo patrón que ya había dejado escrito M2: *"lo encontró el playtest
+automatizado al ejercitar reconexión real, no una revisión de código"*. Cuatro de
+las cinco cosas de arriba eran invisibles para `typecheck` y para los tests
+unitarios porque solo aparecen con la mesa completa.
+
+**Sigue pendiente de M3.5**: el perro mudo (las cuatro alertas sin diferencia
+visual) y la revelación propia del celular en el epílogo. La otra falla de M3.5
+—el fogón mudo— la cerró la cirugía 1, y el layout del epílogo se arregló de
+paso al darle fondo propio al panel.
 
 ## M4 · El modelo
 

@@ -24,7 +24,8 @@ página no puede sacar a nadie de la partida.
 | `unirse` | Celular | Con código de 4 letras y nombre. Con `sesion`, vuelve a su asiento |
 | `votar_tablero` | Celular | En `lobby` |
 | `listo` | Celular | En `lobby` |
-| `elegir` | Celular | En `decidir`. Parcial y repetible: actualiza la boleta en curso |
+| `elegir` | Celular | En `decidir`. Parcial y repetible: actualiza la boleta (ruta, raciones) en curso |
+| `asignar_esfuerzo` | El Capataz, o cualquiera (solo a sí mismo) si no hay Capataz | En `decidir`. Independiente de la boleta (D19): no depende de `elegir`/`bloquear` |
 | `bloquear` | Celular | En `decidir`. Cierra la boleta; desde acá no se cambia |
 | `responder_trato` | Sólo el destinatario | En la noche de la oferta |
 | `entregar_objeto` | Celular | En `acampar` o `fogon` |
@@ -70,13 +71,15 @@ TV, celus ← sala { jugadores: [Vale] }
 todos  ← tv/jugador (fase acampar)     ← el servidor agenda 20 s
 todos  ← tv/jugador (fase decidir)     ← agenda la ventana de la fogata
 celu   → elegir { ruta }
-celu   → elegir { raciones, esfuerzo }
+celu   → elegir { raciones }
 celu   → bloquear
+Cap.   → asignar_esfuerzo { a: [...] } ← independiente, en cualquier momento de la ventana
 TV     ← tv (Vale pasa a "listo")
-       … bloquearon todos, o venció el tiempo …
+       … bloquearon todos y (no hay Capataz o ya repartió), o venció el tiempo …
 todos  ← tv/jugador (fase resolver)    ← gatillo { tipo: 'resolucion' }
                                           y en paralelo, pedido al modelo
-todos  ← tv/jugador (fase fogon)       ← con el relato, o con el respaldo
+todos  ← tv/jugador (fase fogon)       ← con el relato, o con el respaldo, y
+                                          la TV muestra `revelacion`: quién votó qué
 ```
 
 **Volver después de un corte**
@@ -103,10 +106,37 @@ Ningún error cierra la conexión. El cliente muestra el mensaje y sigue.
 
 ## Versionado
 
-`VERSION_PROTOCOLO` entero, en `bienvenida`. Si no coincide, el servidor manda
-`version_incompatible` y el cliente muestra *"recargá la página"*. No hay
-negociación ni compatibilidad hacia atrás: cliente y servidor se despliegan juntos
-y una partida dura 25 minutos.
+`VERSION_PROTOCOLO` entero, en `bienvenida`. No hay negociación ni compatibilidad
+hacia atrás: cliente y servidor se despliegan juntos y una partida dura 25 minutos.
+
+**El chequeo es del lado del cliente**, y tiene que serlo: el cliente nunca le
+manda su versión al servidor, así que el servidor no puede detectar el desajuste.
+Al llegar la `bienvenida`, `decidirPorVersion()` decide entre tres cosas:
+
+| Situación | Qué pasa |
+|---|---|
+| Coincide | Sigue normal |
+| No coincide, primera vez | El cliente **se recarga solo** y baja el bundle nuevo |
+| No coincide después de recargar | Se rinde: corta la reconexión y muestra el cartel |
+
+Recargar alcanza porque `estaticos.ts` sirve `index.html` con `no-cache` y los
+assets de Vite llevan hash. Se intenta **una sola vez** (marca en
+`sessionStorage`): si después de recargar sigue sin coincidir, el problema no es
+el caché y recargar en loop solo esconde el error.
+
+Sin esto, un celular o una TV con la página abierta durante un deploy reconecta
+el socket con el JS viejo en memoria y queda en una pantalla muda: el socket
+anda, el servidor es nuevo, el cliente no entiende lo que le llega y no aparece
+ningún error. La TV es la más expuesta porque se queda prendida horas.
+
+**Cuándo se sube**: cuando un cliente viejo deja de funcionar contra un servidor
+nuevo — un mensaje que se va, un campo obligatorio nuevo, una `Accion` que cambia
+de forma. No hace falta para agregar campos opcionales.
+
+> **Deuda conocida**: el código de error `version_incompatible` está declarado en
+> `CodigoError` y no se emite en ningún lado. Quedó de un diseño anterior en el
+> que el chequeo era del servidor, que no puede funcionar por lo de arriba. O se
+> borra, o el cliente empieza a mandar su versión al conectarse.
 
 ## Conexiones que se caen solas
 

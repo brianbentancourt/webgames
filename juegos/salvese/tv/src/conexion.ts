@@ -7,6 +7,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { MensajeEntrante, MensajeSaliente } from '@salvese/core';
+import { decidirPorVersion, CLAVE_REINTENTO_VERSION } from '@salvese/core';
 
 export const URL_SERVIDOR: string =
   import.meta.env['VITE_SERVIDOR'] ??
@@ -20,6 +21,8 @@ export const URL_SERVIDOR: string =
 export function useConexion() {
   const [estado, setEstado] = useState<'conectando' | 'abierta' | 'cerrada'>('conectando');
   const [ultimo, setUltimo] = useState<MensajeSaliente | null>(null);
+  /** El servidor habla otra versión y recargarse no alcanzó. */
+  const [desactualizado, setDesactualizado] = useState(false);
   const socket = useRef<WebSocket | null>(null);
 
   useEffect(() => {
@@ -38,7 +41,30 @@ export function useConexion() {
         setEstado('abierta');
         ws.send(JSON.stringify({ t: 'abrir_sala' } satisfies MensajeEntrante));
       };
-      ws.onmessage = (ev) => setUltimo(JSON.parse(ev.data as string) as MensajeSaliente);
+      ws.onmessage = (ev) => {
+        const msg = JSON.parse(ev.data as string) as MensajeSaliente;
+        if (msg.t === 'bienvenida') {
+          // La TV se queda prendida horas: es la que más probabilidad tiene de
+          // atravesar un deploy con el JS viejo en memoria (ver protocolo.ts).
+          const decision = decidirPorVersion(
+            msg.version,
+            sessionStorage.getItem(CLAVE_REINTENTO_VERSION) === '1',
+          );
+          if (decision === 'recargar') {
+            sessionStorage.setItem(CLAVE_REINTENTO_VERSION, '1');
+            location.reload();
+            return;
+          }
+          if (decision === 'rendirse') {
+            vivo = false;
+            setDesactualizado(true);
+            ws.close();
+            return;
+          }
+          sessionStorage.removeItem(CLAVE_REINTENTO_VERSION);
+        }
+        setUltimo(msg);
+      };
       ws.onclose = () => {
         setEstado('cerrada');
         if (!vivo) return;
@@ -60,5 +86,5 @@ export function useConexion() {
     if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(mensaje));
   };
 
-  return { estado, ultimo, mandar };
+  return { estado, ultimo, mandar, desactualizado };
 }

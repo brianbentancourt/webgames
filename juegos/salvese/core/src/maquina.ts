@@ -1,9 +1,9 @@
 import type { JugadorId, TableroId, TramoId, ObjetoId, ObjetivoId } from './ids.js';
 import { jugadorId, objetoId } from './ids.js';
-import type { EstadoPartida, NivelRaciones, Viajero, EstadoNoche, Boleta, EntradaCronica, Fase, Vigor, Tramo } from './estado.js';
+import type { EstadoPartida, NivelRaciones, Viajero, EstadoNoche, Boleta, EntradaCronica, Fase, Vigor, Tramo, RevelacionBoletas } from './estado.js';
 import type { Escena, PedidoRelato, ResultadoRelato } from './llm.js';
 import type { Gatillo } from './vistas.js';
-import { VIGOR_MAX, VIGOR_INICIAL, RACIONES, AVANCE, TIEMPOS, ventanaDecidirMs, PERRO_MIENTE } from './config.js';
+import { VIGOR_MAX, VIGOR_INICIAL, RACIONES, AVANCE, TIEMPOS, ventanaDecidirMs, hayRepartoDeEsfuerzo, PERRO_MIENTE } from './config.js';
 import { crearRng } from './rng.js';
 import { REPARTO, type Rol } from './roles.js';
 
@@ -18,9 +18,14 @@ export type Comando =
       jugador: JugadorId;
       ruta?: TramoId;
       raciones?: NivelRaciones;
-      esfuerzo?: JugadorId[];
     }
   | { t: 'bloquear'; jugador: JugadorId }
+  /**
+   * A quiénes manda al trabajo pesado esta noche (D19). Del Capataz si hay uno
+   * en la mesa; si no, cada uno solo puede mandarse a sí mismo. Independiente
+   * de `elegir`/`bloquear` a propósito: no depende de la boleta.
+   */
+  | { t: 'asignar_esfuerzo'; jugador: JugadorId; a: JugadorId[] }
   | { t: 'responder_trato'; jugador: JugadorId; acepta: boolean }
   | { t: 'entregar_objeto'; de: JugadorId; a: JugadorId }
   /** Vence el reloj de la fase actual. Lo dispara el servidor, no un jugador. */
@@ -126,6 +131,7 @@ export function reducir(estado: EstadoPartida, comando: Comando): Resultado {
       perro: { presente: true, alerta: 'ninguna', dice_la_verdad: true },
       objetos: [],
       cronica: [],
+      esfuerzoNocheAnterior: [],
     };
     return {
       ok: true,
@@ -400,12 +406,10 @@ export function reducir(estado: EstadoPartida, comando: Comando): Resultado {
       const candidatos = estado.nocheActual!.candidatos;
       const ruta = comando.ruta ?? boletaExistente?.ruta ?? candidatos[0]!.id;
       const raciones = comando.raciones ?? boletaExistente?.raciones ?? 'normal';
-      const esfuerzo = comando.esfuerzo ?? boletaExistente?.esfuerzo ?? [];
 
       const boleta: Boleta = {
         ruta,
         raciones,
-        esfuerzo,
         bloqueadaEn: 0,
       };
 
@@ -428,13 +432,91 @@ export function reducir(estado: EstadoPartida, comando: Comando): Resultado {
       };
     }
 
+    if (comando.t === 'asignar_esfuerzo') {
+      const nocheActual = estado.nocheActual;
+      if (!nocheActual) return { ok: false, motivo: 'fuera_de_fase' };
+
+      // En la noche 1 no se reparte (D8): el celular no ofrece la acción, así
+      // que tampoco se acepta el comando. Si se aceptara, el estado tendría un
+      // reparto que ninguna pantalla mostró.
+      if (!hayRepartoDeEsfuerzo(estado.noche)) return { ok: false, motivo: 'fuera_de_fase' };
+
+      const capataz = estado.viajeros.find((v) => v.rol === 'capataz');
+      const hayCapataz = capataz !== undefined;
+
+      // Con Capataz en la mesa, solo él reparte. Sin Capataz, el esfuerzo es
+      // voluntario: cada uno solo puede mandarse a sí mismo (D19).
+      if (hayCapataz) {
+        if (comando.jugador !== capataz.id) return { ok: false, motivo: 'jugada_invalida' };
+      } else {
+        if (comando.a.some((id) => id !== comando.jugador)) {
+          return { ok: false, motivo: 'jugada_invalida' };
+        }
+      }
+
+      if (comando.a.length > AVANCE.esfuerzoMax) return { ok: false, motivo: 'jugada_invalida' };
+      if (new Set(comando.a).size !== comando.a.length) return { ok: false, motivo: 'jugada_invalida' };
+      if (!comando.a.every((id) => estado.viajeros.some((v) => v.id === id))) {
+        return { ok: false, motivo: 'jugada_invalida' };
+      }
+      if (comando.a.some((id) => estado.viajeros.find((v) => v.id === id)?.vigor === 0)) {
+        return { ok: false, motivo: 'jugada_invalida' };
+      }
+      if (comando.a.some((id) => estado.esfuerzoNocheAnterior.includes(id))) {
+        return { ok: false, motivo: 'jugada_invalida' };
+      }
+
+      let nuevaLista: JugadorId[];
+      if (hayCapataz) {
+        // El Capataz manda la lista entera: reemplaza lo que hubiera.
+        nuevaLista = comando.a;
+      } else {
+        // Voluntario: cada uno declara solo su propia participación; hay que
+        // mezclarla con lo que ya declararon los demás, no pisarlo.
+        const actual = nocheActual.esfuerzoAsignado ?? [];
+        const sinEste = actual.filter((id) => id !== comando.jugador);
+        nuevaLista = comando.a.includes(comando.jugador) ? [...sinEste, comando.jugador] : sinEste;
+        if (nuevaLista.length > AVANCE.esfuerzoMax) return { ok: false, motivo: 'jugada_invalida' };
+      }
+
+      const respondieronPrevio = nocheActual.esfuerzoRespondieron ?? [];
+      const nuevaNocheActual: EstadoNoche = {
+        ...nocheActual,
+        esfuerzoAsignado: nuevaLista,
+        esfuerzoRespondieron: respondieronPrevio.includes(comando.jugador)
+          ? respondieronPrevio
+          : [...respondieronPrevio, comando.jugador],
+      };
+      const nuevoEstado = { ...estado, nocheActual: nuevaNocheActual };
+
+      // Si el Capataz reparte último —todos los demás ya habían bloqueado su
+      // boleta esperando justo esto— hay que resolver ahora: `bloquear` ya no
+      // va a volver a ejecutarse para disparar el atajo.
+      if (hayCapataz) {
+        const boletasActuales = nuevoEstado.nocheActual?.boletas as Record<JugadorId, Boleta> | undefined;
+        const todosBloquearon = nuevoEstado.viajeros.every(
+          (v) => (boletasActuales?.[v.id]?.bloqueadaEn ?? 0) > 0
+        );
+        if (todosBloquearon) {
+          return resolverNoche(nuevoEstado, ahora, false);
+        }
+      }
+
+      return {
+        ok: true,
+        transicion: {
+          estado: nuevoEstado,
+          efectos: [{ t: 'publicar', a: { jugador: comando.jugador } }],
+        },
+      };
+    }
+
     if (comando.t === 'bloquear') {
       const boleta = estado.nocheActual?.boletas[comando.jugador];
       const candidatos = estado.nocheActual!.candidatos;
       const nuevaBoleta: Boleta = {
         ruta: boleta?.ruta ?? candidatos[0]!.id,
         raciones: boleta?.raciones ?? 'normal',
-        esfuerzo: boleta?.esfuerzo ?? [],
         bloqueadaEn: ahora,
       };
 
@@ -450,13 +532,29 @@ export function reducir(estado: EstadoPartida, comando: Comando): Resultado {
 
       const nuevoEstado = { ...estado, nocheActual };
 
-      // Si todos bloquearon, resolver inmediatamente
+      // Si todos bloquearon, resolver inmediatamente — pero sin robarle la
+      // ventana al Capataz: si hay uno en la mesa y todavía no repartió el
+      // esfuerzo, se espera. Sin Capataz (esfuerzo voluntario) alcanza con que
+      // todos hayan bloqueado la boleta.
+      //
+      // La noche 1 es la excepción y hay que respetarla acá: no se reparte
+      // esfuerzo (D8), así que el Capataz nunca va a mandar `asignar_esfuerzo`
+      // y esperarlo sería esperar para siempre — la mesa bloquea en veinte
+      // segundos y se queda mirando el teléfono hasta que vence la ventana.
       const boletasActuales = nuevoEstado.nocheActual?.boletas as Record<JugadorId, Boleta> | undefined;
       const todosBloquearon = nuevoEstado.viajeros.every(
         (v) => (boletasActuales?.[v.id]?.bloqueadaEn ?? 0) > 0
       );
+      const capatazEnMesa = nuevoEstado.viajeros.find((v) => v.rol === 'capataz');
+      const capatazYaReparto = (
+        nuevoEstado.nocheActual?.esfuerzoRespondieron ?? []
+      ).includes(capatazEnMesa?.id as JugadorId);
+      const seEsperaAlCapataz =
+        capatazEnMesa !== undefined &&
+        hayRepartoDeEsfuerzo(nuevoEstado.noche) &&
+        !capatazYaReparto;
 
-      if (todosBloquearon) {
+      if (todosBloquearon && !seEsperaAlCapataz) {
         return resolverNoche(nuevoEstado, ahora, false);
       }
 
@@ -867,7 +965,6 @@ function resolverNoche(
       // Es ausente
       let ruta = b?.ruta;
       let raciones = b?.raciones;
-      let esfuerzo = b?.esfuerzo ?? [];
 
       // Si no eligió ruta/raciones, votar por mayoría del resto
       if (!ruta) {
@@ -907,13 +1004,9 @@ function resolverNoche(
         raciones = racGanadora;
       }
 
-      // Esfuerzo ausente es siempre vacio
-      esfuerzo = [];
-
       boletas[v.id] = {
         ruta,
         raciones,
-        esfuerzo,
         bloqueadaEn: ahora,
       };
     }
@@ -1013,27 +1106,42 @@ function resolverNoche(
     }
   }
 
-  // Esfuerzo
-  // Contamos votos por viajero
-  const votosEsfuerzo: Record<JugadorId, number> = {};
-  estado.viajeros.forEach((v) => {
-    votosEsfuerzo[v.id] = 0;
-  });
-  estado.viajeros.forEach((v) => {
-    const e = boletas[v.id]?.esfuerzo ?? [];
-    e.forEach((id) => {
-      votosEsfuerzo[id as JugadorId] = (votosEsfuerzo[id as JugadorId] || 0) + 1;
-    });
-  });
+  // Esfuerzo (D19): ya no se vota, lo reparte el Capataz —o cada uno a sí
+  // mismo si no hay Capataz en la mesa— con el comando `asignar_esfuerzo`,
+  // independiente de la boleta. La validación de quién puede asignar y a
+  // quién ya pasó en el reducer de `decidir`; acá solo se filtra por vigor
+  // (por si algo cambió entre la asignación y el cierre) y se corta al máximo.
+  const decisionEsfuerzo = (estado.nocheActual!.esfuerzoAsignado ?? [])
+    .filter((id) => {
+      const v = estado.viajeros.find((x) => x.id === id);
+      return v !== undefined && v.vigor > 0;
+    })
+    .slice(0, AVANCE.esfuerzoMax);
 
-  // Filtrar viajeros con vigor > 0
-  const viajerosConVigor = estado.viajeros.filter((v) => v.vigor > 0);
-  // Ordenar por votos desc
-  const ordenados = [...viajerosConVigor].sort(
-    (a, b) => (votosEsfuerzo[b.id] || 0) - (votosEsfuerzo[a.id] || 0)
-  );
-
-  const decisionEsfuerzo = ordenados.slice(0, AVANCE.esfuerzoMax).map((v) => v.id);
+  // Revelación del fogón (D18): se computa acá, con los nombres ya resueltos a
+  // texto, porque `nocheActual` no sobrevive el pasaje a `epilogo` y la última
+  // noche tiene que poder revelarse igual (ver estado.ts § RevelacionBoletas).
+  const nombreDe = (id: JugadorId) => estado.viajeros.find((v) => v.id === id)?.nombre ?? '';
+  const ultimaRevelacion: RevelacionBoletas = {
+    noche: estado.noche,
+    ruta: candidatos.map((c) => ({
+      nombre: c.nombre,
+      votantes: estado.viajeros.filter((v) => boletas[v.id]?.ruta === c.id).map((v) => v.nombre),
+      gano: c.id === decisionRuta,
+    })),
+    raciones: (['ajustado', 'normal', 'abundante'] as NivelRaciones[]).map((nivel) => ({
+      nivel,
+      votantes: estado.viajeros.filter((v) => boletas[v.id]?.raciones === nivel).map((v) => v.nombre),
+      gano: nivel === decisionRaciones,
+    })),
+    esfuerzo: decisionEsfuerzo.map((id) => nombreDe(id)),
+    // Solo si el Capataz efectivamente repartió: si no llegó a hacerlo, la TV
+    // no puede atribuirle un reparto que no hizo.
+    ...(capataz && (estado.nocheActual!.esfuerzoRespondieron ?? []).includes(capataz.id)
+      ? { repartio: capataz.nombre }
+      : {}),
+    via: viaRuta,
+  };
 
   // 12 pasos de resolución
   // 1. Se fija la ruta
@@ -1252,6 +1360,8 @@ function resolverNoche(
     objetos: nuevosObjetos,
     cronica: [...estado.cronica, nuevaCronica],
     perro: { ...estado.perro, presente: perroPresente },
+    esfuerzoNocheAnterior: decisionEsfuerzo,
+    ultimaRevelacion,
   };
 
   // Efecto LLM

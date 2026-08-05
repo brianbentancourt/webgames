@@ -8,11 +8,14 @@ ambigüedad.
 > Se ajustan jugando. Lo que no se cambia sin pasar por `decisiones.md` son las
 > formas: cinco noches, tres decisiones, tres minutos de discusión.
 
-## Las tres decisiones
+## Dos decisiones más un reparto
 
-Cada jugador bloquea una **boleta** con las tres: ruta, raciones y esfuerzo. No hay
-votación por separado ni turnos: se discute en voz alta y cada uno bloquea lo suyo
-en secreto.
+Cada jugador bloquea una **boleta** con dos: ruta y raciones. No hay votación por
+separado ni turnos: se discute en voz alta y cada uno bloquea lo suyo en secreto.
+
+El esfuerzo **ya no está en la boleta** (D19): lo reparte el Capataz —o cada uno de
+sí mismo si no hay Capataz en la mesa— con un comando aparte, `asignar_esfuerzo`,
+independiente de bloquear la boleta. Ver más abajo, § El esfuerzo.
 
 ### Ruta
 
@@ -31,15 +34,9 @@ Tres niveles. El consumo es **por viajero**:
 | `normal` | 2 | 0 |
 | `abundante` | 3 | +1 a todos |
 
-### Esfuerzo
-
-A quiénes se manda al trabajo pesado. Máximo 3 viajeros. Cada uno suma 1 legua de
-avance y paga 1 de vigor. Un viajero en vigor 0 no puede ser asignado; si igual lo
-mandan, se ignora y queda en la crónica.
-
 ## Conteo de boletas
 
-Cada dimensión se cuenta **por separado**. Que la mesa se parta en la ruta no
+Ruta y raciones se cuentan **por separado**. Que la mesa se parta en la ruta no
 arrastra la decisión de raciones, y eso produce noches donde el grupo eligió el
 atajo *y* comió poco sin que nadie lo haya propuesto junto. Ese descalce es
 deliberado: es de dónde salen las anécdotas.
@@ -47,7 +44,8 @@ deliberado: es de dónde salen las anécdotas.
 1. **Mayoría simple** por dimensión.
 2. **Empate** → decide el Capataz (`via: 'desempate_capataz'`). Es el rol que tiene
    poder y no información.
-3. **Empate sin Capataz en la mesa** (2 jugadores) → decide el `Rng` de la semilla.
+3. **Empate sin Capataz en la mesa** (2 y 3 jugadores) → decide el `Rng` de la
+   semilla.
 4. **Noche 5** → el Capataz decide solo, salvo que **todos** los demás hayan
    bloqueado lo mismo y distinto a él (`via: 'oposicion_unanime'`). Cambia la
    estructura social de la mesa, no los números.
@@ -60,10 +58,51 @@ cocina, se desconectó— el motor completa por él:
 - **Ruta y raciones**: lo que haya elegido parcialmente; si no eligió nada, la
   opción mayoritaria del resto. Nunca se abstiene: un voto menos cambia mayorías y
   el ausente terminaría decidiendo por omisión.
-- **Esfuerzo**: lista vacía. Mandar gente al trabajo pesado es lo único que puede
-  quebrar a un viajero, y no se hace en nombre de alguien que no está.
 
 La `via` de esa noche queda en `'vencio_el_tiempo'` y la crónica lo menciona.
+
+## El esfuerzo
+
+**El Capataz no vota: reparte** (D19). Cada noche nombra hasta `AVANCE.esfuerzoMax`
+(3) viajeros para el trabajo pesado, con el comando `asignar_esfuerzo`. Cada uno
+suma 1 legua de avance y paga 1 de vigor.
+
+- **No se puede mandar a la misma persona dos noches seguidas.** `esfuerzoNocheAnterior`
+  en `EstadoPartida` es lo que hace esa regla cumplible sin releer la crónica.
+- **Un viajero con vigor 0 no puede ser asignado.**
+- **Sin Capataz en la mesa** (2 y 3 jugadores, ver `REPARTO`): el esfuerzo es
+  **voluntario**. Cada uno declara si se ofrece a sí mismo con el mismo comando; no
+  puede asignar a nadie más.
+- **Independiente de la boleta**: asignar esfuerzo no depende de haber bloqueado
+  ruta y raciones, ni al revés. El atajo de "resolver apenas todos bloquean" (ver
+  abajo) respeta esto: no le roba la ventana al Capataz.
+- **Si nadie asigna nada antes de que venza la ventana**, el esfuerzo de esa noche
+  es lista vacía. Mismo criterio que la boleta ausente: mandar gente al trabajo
+  pesado no se hace en nombre de alguien que no está.
+
+### El atajo de "todos bloquearon"
+
+Cuando todos bloquean su boleta antes de que venza el reloj, la noche se resuelve
+al instante en vez de esperar el resto de la ventana — **salvo que haya Capataz en
+la mesa y todavía no haya repartido el esfuerzo**: en ese caso se espera a que
+reparta (aunque reparta una lista vacía) antes de resolver. Sin Capataz (esfuerzo
+voluntario) alcanza con que todos hayan bloqueado la boleta.
+
+**La noche 1 no espera a nadie**: no se reparte esfuerzo (D8), así que esperar al
+Capataz sería esperar algo que no va a llegar nunca. Esa condición sale de
+`hayRepartoDeEsfuerzo(noche)` en `config.ts`, que es el **mismo** helper que usa la
+proyección para decidir si ofrece la acción. Tienen que estar de acuerdo por
+construcción: cuando no lo estaban, la mesa bloqueaba en veinte segundos y se
+quedaba mirando el teléfono los otros setenta hasta que vencía la ventana. Es
+justo el minuto del que depende que la mesa se enganche.
+
+## Las boletas se revelan en el fogón
+
+Secretas **durante** la noche, públicas **después** (D18). Al resolver, el motor
+computa una `RevelacionBoletas` —quién votó qué en ruta y raciones, con nombre, a
+quiénes se mandó al esfuerzo y quién repartió— y la guarda en
+`EstadoPartida.ultimaRevelacion`. La TV la muestra en el fogón. Ver
+[01 · Modelo de dominio](01-modelo-de-dominio.md) § Qué es secreto y dónde.
 
 ## Orden de resolución
 
@@ -71,23 +110,27 @@ Estricto y sin excepciones. Todo lo que consume azar lo hace del `Rng` de la
 semilla, en este orden, para que la partida sea reproducible:
 
 1. **Se fija la ruta.** Se lee `dureza`, `costoRecurso`, `hallazgo` del tramo.
-2. **Avance** = `base (2) + esfuerzo × 1 − dureza`, mínimo 0.
+2. **Se fija el esfuerzo**: lo que repartió el Capataz (o lo que se ofrecieron),
+   filtrado a quienes todavía tengan vigor y cortado a `AVANCE.esfuerzoMax`.
+3. **Avance** = `base (2) + esfuerzo × 1 − dureza`, mínimo 0.
    `avance += resultado`.
-3. **Consumo** = `viajeros × consumoPorViajero[raciones] + costoRecurso`, mínimo 0.
+4. **Consumo** = `viajeros × consumoPorViajero[raciones] + costoRecurso`, mínimo 0.
    `recurso = max(0, recurso − consumo)`.
-4. **Vigor por esfuerzo**: −1 a cada asignado.
-5. **Vigor por raciones**: el efecto de la tabla, a todos.
-6. **Hambre**: si el consumo no se pudo pagar entero (`recurso` llegó a 0), −1 más
+5. **Vigor por esfuerzo**: −1 a cada asignado.
+6. **Vigor por raciones**: el efecto de la tabla, a todos.
+7. **Hambre**: si el consumo no se pudo pagar entero (`recurso` llegó a 0), −1 más
    a todos. Es acumulativo con lo anterior: la noche que se acaba la comida duele.
-7. **Objetos**: se aplican los efectos de los que estén activos, en orden de
+8. **Objetos**: se aplican los efectos de los que estén activos, en orden de
    adquisición.
-8. **Hallazgo**: `rng.suerte(tramo.hallazgo)` y, si sale, se saca un arquetipo del
+9. **Hallazgo**: `rng.suerte(tramo.hallazgo)` y, si sale, se saca un arquetipo del
    mazo del tablero. Si ya hay 4 objetos activos, no sale nada.
-9. **Degradación**: `usosRestantes--` en todos los objetos activos; los que llegan a
-   0 se caen.
-10. **El perro** (ver abajo).
-11. **El trato**, si corresponde esta noche.
-12. **Final**: se evalúa si Sálvese quien pueda! terminó.
+10. **Degradación**: `usosRestantes--` en todos los objetos activos; los que llegan a
+    0 se caen.
+11. **El perro** (ver abajo).
+12. **El trato**, si corresponde esta noche.
+13. **Revelación de boletas**: se computa `RevelacionBoletas` y se guarda en
+    `ultimaRevelacion` (ver arriba).
+14. **Final**: se evalúa si Sálvese quien pueda! terminó.
 
 ## El perro
 

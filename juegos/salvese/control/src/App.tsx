@@ -2,15 +2,15 @@
  * El celular. Una acción por pantalla, nunca dos.
  *
  * ESTADO: entrar a la sala y marcarse listo. Las pantallas de ruta, raciones y
- * esfuerzo entran cuando el servidor mande vistas `jugador`
- * (ver docs/specs/09-cliente-control.md).
+ * el reparto del esfuerzo (para el Capataz, o para uno mismo si no hay) entran
+ * cuando el servidor mande vistas `jugador` (ver docs/specs/09-cliente-control.md).
  */
 /**
  * El celular. Una acción por pantalla, nunca dos.
  *
  * ESTADO: entrar a la sala y marcarse listo. Las pantallas de ruta, raciones y
- * esfuerzo entran cuando el servidor mande vistas `jugador`
- * (ver docs/specs/09-cliente-control.md).
+ * el reparto del esfuerzo (para el Capataz, o para uno mismo si no hay) entran
+ * cuando el servidor mande vistas `jugador` (ver docs/specs/09-cliente-control.md).
  */
 
 import { useEffect, useState } from 'react';
@@ -19,7 +19,7 @@ import { useConexion } from './conexion.js';
 import { JuegoControl } from './JuegoControl.js';
 
 function ContenidoApp() {
-  const { estado, ultimo, mandar } = useConexion();
+  const { estado, ultimo, mandar, desactualizado } = useConexion();
   const [codigo, setCodigo] = useState('');
   const [nombre, setNombre] = useState('');
   const [dentro, setDentro] = useState(false);
@@ -84,6 +84,19 @@ function ContenidoApp() {
     }
     mandar(params);
   };
+
+  // Recargarse solo ya se intentó una vez en `conexion.ts` y no alcanzó: acá el
+  // problema no es el caché, así que se dice y no se reintenta en loop.
+  if (desactualizado) {
+    return (
+      <main className="pantalla">
+        <p className="titulo">esta pantalla quedó vieja</p>
+        <p className="linea">
+          El servidor se actualizó. Cerrá la pestaña y volvé a abrirla desde el código de la sala.
+        </p>
+      </main>
+    );
+  }
 
   if (estado !== 'abierta') {
     return (

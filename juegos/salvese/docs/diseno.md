@@ -17,12 +17,16 @@ ACAMPAR  →  DECIDIR  →  RESOLVER  →  FOGÓN
 ```
 
 - **Acampar** — cada celular recibe lo suyo. La TV muestra el estado del grupo.
-- **Decidir** — tres decisiones: ruta, raciones, esfuerzo. Se discute en voz alta y se
-  bloquea en secreto. **La fogata es el reloj**: se consume durante la ventana y la luz
-  sobre los viajeros baja con ella. Los dígitos aparecen solo en los últimos 30 segundos.
+- **Decidir** — dos decisiones en la boleta (ruta, raciones) más el reparto del
+  esfuerzo, que el Capataz maneja aparte y todas las noches. Se discute en voz alta,
+  la boleta se bloquea en secreto y el esfuerzo se reparte en secreto también.
+  **La fogata es el reloj**: se consume durante la ventana y la luz sobre los
+  viajeros baja con ella. Los dígitos aparecen solo en los últimos 30 segundos.
 - **Resolver** — única cutscene de la noche. La caravana avanza y el camino cuenta qué pasó.
-- **Fogón** — el camino hace una pregunta incómoda sobre lo que acaban de hacer.
-  No es un chiste del juego: le pasa el micrófono al grupo.
+- **Fogón** — se revela quién votó qué la noche anterior, con nombre, y a quién se
+  mandó al trabajo pesado. El camino hace una pregunta incómoda sobre lo que acaban
+  de hacer y le pasa el micrófono al grupo: acá es donde alguien dice *"¡vos dijiste
+  que ibas al río!"*.
 
 ---
 
@@ -37,6 +41,12 @@ Nombre lindo en la TV, nombre plano en el celular. Nadie tiene que aprender voca
 | Despensero | el que cuenta la comida | el inventario exacto | quién aguanta el hambre |
 | Memorioso | el que se acuerda | el registro de travesías previas (a veces falso) | el presente |
 | Capataz | el que manda | nada | nada — tiene poder, no información |
+
+**El Capataz no vota: reparte.** Todas las noches nombra hasta 3 viajeros para el
+trabajo pesado — no solo en los empates y en la noche 5. No puede mandar a la misma
+persona dos noches seguidas: sin esa fricción el óptimo es obvio y la decisión se
+muere en la segunda noche. Sin Capataz en la mesa (2 y 3 jugadores) el esfuerzo es
+voluntario: cada uno declara si se ofrece.
 
 **Combos**: las jugadas fuertes exigen dos personas sincronizadas en la misma ventana.
 Eso no se coordina con un botón, se coordina hablando.

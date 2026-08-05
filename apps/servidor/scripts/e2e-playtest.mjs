@@ -17,9 +17,27 @@ import WebSocket from 'ws';
 
 const PUERTO = process.env.PUERTO ?? '8787';
 const URL = `ws://localhost:${PUERTO}/ws`;
-const NOMBRES = ['Nico', 'Vale', 'Seba'];
+/**
+ * Cinco, no tres: con tres jugadores `REPARTO` no pone Capataz en la mesa, así
+ * que el esfuerzo cae siempre en el modo voluntario y el reparto del Capataz
+ * —el corazón de D19— no se ejercita nunca. Con cinco hay Capataz y además es
+ * el punto óptimo de diseño. La partida de 3 quedó cubierta por los tests del
+ * motor, que sí prueban el modo voluntario.
+ */
+const NOMBRES = ['Nico', 'Vale', 'Seba', 'Pili', 'Tato'];
 
-const resultado = { entregoObjeto: false, respondioTrato: false, reconecto: false, votoTablero: false };
+const resultado = {
+  entregoObjeto: false,
+  respondioTrato: false,
+  reconecto: false,
+  votoTablero: false,
+  /** Alguien repartió el trabajo pesado (el Capataz, con 5 jugadores). */
+  asignoEsfuerzo: false,
+  /** El reparto lo mandó efectivamente el Capataz, no un voluntario. */
+  repartioCapataz: false,
+  /** La TV mostró la revelación de boletas en el fogón (D18). */
+  vioRevelacion: false,
+};
 
 function conectar() {
   return new WebSocket(URL);
@@ -122,6 +140,22 @@ class Jugador {
       }
     }
 
+    // El reparto del esfuerzo (D19) es independiente de la boleta. El servidor
+    // dice con `yaReparti` si este jugador ya mandó el suyo esta noche, así que
+    // no hace falta recordarlo del lado del bot: es el mismo dato que usa el
+    // celular real. Con 5 jugadores hay Capataz en la mesa (REPARTO), así que
+    // esto ejercita el reparto de verdad y no el modo voluntario.
+    let hizoAlgo = false;
+    const accionEsfuerzo = v.acciones.find((a) => a.tipo === 'repartir_esfuerzo');
+    if (accionEsfuerzo && !accionEsfuerzo.yaReparti) {
+      const disponibles = accionEsfuerzo.opciones.filter((o) => o.disponible);
+      const a = disponibles.slice(0, accionEsfuerzo.max).map((o) => o.id);
+      this.mandar({ t: 'asignar_esfuerzo', a });
+      resultado.asignoEsfuerzo = true;
+      if (accionEsfuerzo.modo === 'capataz') resultado.repartioCapataz = true;
+      hizoAlgo = true;
+    }
+
     // Noche 1 con tutorial: solo bloquear, el motor completa el resto.
     if (v.acciones.length === 1 && v.acciones[0].tipo === 'bloquear') {
       this.mandar({ t: 'bloquear' });
@@ -129,21 +163,19 @@ class Jugador {
     }
 
     // Boleta normal: ruta + raciones ajustadas (para forzar hambre/quiebre en
-    // algún momento de Sálvese quien pueda!) + a mí mismo al esfuerzo, y bloquear.
+    // algún momento de Sálvese quien pueda!), y bloquear.
     const accionRuta = v.acciones.find((a) => a.tipo === 'elegir_ruta');
-    const accionEsfuerzo = v.acciones.find((a) => a.tipo === 'elegir_esfuerzo');
     if (accionRuta) {
       this.mandar({
         t: 'elegir',
         ruta: accionRuta.opciones[0].id,
         raciones: 'ajustado',
-        esfuerzo: accionEsfuerzo ? accionEsfuerzo.opciones.slice(0, 1).map((o) => o.id) : [],
       });
       this.mandar({ t: 'bloquear' });
       return true;
     }
 
-    return false;
+    return hizoAlgo;
   }
 }
 
@@ -171,10 +203,13 @@ async function main() {
 
   // Votar tablero: todos votan La Sierra salvo el último, que vota distinto,
   // así se ejercita el conteo además del mensaje.
-  jugadores[0].mandar({ t: 'votar_tablero', tablero: 'la-sierra' });
-  jugadores[1].mandar({ t: 'votar_tablero', tablero: 'la-sierra' });
-  jugadores[2].mandar({ t: 'votar_tablero', tablero: 'el-salitral' });
-  const salaConVotos = await esperar(tv, (m) => m.t === 'sala' && Object.keys(m.votos).length === 3);
+  jugadores.forEach((j, i) => {
+    j.mandar({ t: 'votar_tablero', tablero: i === jugadores.length - 1 ? 'el-salitral' : 'la-sierra' });
+  });
+  const salaConVotos = await esperar(
+    tv,
+    (m) => m.t === 'sala' && Object.keys(m.votos).length === jugadores.length,
+  );
   if (salaConVotos.votos[jugadores[0].id] !== 'la-sierra') throw new Error('el voto no llegó a la sala');
   resultado.votoTablero = true;
   console.log('votar_tablero: ok, tablas', salaConVotos.votos);
@@ -196,6 +231,23 @@ async function main() {
     if (vistaTV?.noche !== ultimaNoche) {
       ultimaNoche = vistaTV?.noche ?? ultimaNoche;
       console.log(`--- noche ${ultimaNoche} · fase ${vistaTV?.fase} ---`);
+    }
+
+    // La revelación de boletas (D18) es secreta durante la ventana: que salga
+    // antes del fogón es el bug que rompe el juego de información oculta, así
+    // que el playtest falla en vez de avisar.
+    if (vistaTV?.revelacion && vistaTV.fase !== 'fogon' && vistaTV.fase !== 'epilogo') {
+      throw new Error(`la revelación de boletas se filtró en fase ${vistaTV.fase}`);
+    }
+    if (vistaTV?.fase === 'fogon' && vistaTV.revelacion) {
+      if (!resultado.vioRevelacion) {
+        console.log(
+          `  fogón revela: ruta ganadora "${vistaTV.revelacion.ruta.find((r) => r.gano)?.nombre}"` +
+            `, esfuerzo [${vistaTV.revelacion.esfuerzo.join(', ')}]` +
+            `${vistaTV.revelacion.repartio ? ` — repartió ${vistaTV.revelacion.repartio}` : ''}`,
+        );
+      }
+      resultado.vioRevelacion = true;
     }
 
     // A mitad de camino, se cae un celular y vuelve con su token.
@@ -229,6 +281,13 @@ async function main() {
   if (!vistaTV.desenlace || vistaTV.desenlace.objetivos.length !== jugadores.length) {
     throw new Error('el epílogo no trajo un desenlace completo');
   }
+
+  // La última noche va de `resolver` directo a `epilogo` salteando el fogón: si
+  // su revelación no llega acá, no se muestra en ninguna parte (D18).
+  if (!vistaTV.revelacion) {
+    throw new Error('el epílogo no trajo la revelación de la última noche');
+  }
+  console.log(`revelación de la última noche: noche ${vistaTV.revelacion.noche}, vía ${vistaTV.revelacion.via}`);
 
   console.log('\n=== RESULTADO ===');
   console.log(JSON.stringify(resultado, null, 2));

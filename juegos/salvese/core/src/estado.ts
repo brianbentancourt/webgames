@@ -75,6 +75,24 @@ export interface EstadoNoche {
   candidatos: Tramo[];
   /** Boletas bloqueadas, por jugador. Secretas hasta que resuelve la noche. */
   boletas: Record<JugadorId, Boleta>;
+  /**
+   * A quiénes manda al trabajo pesado esta noche. Lo decide el Capataz (o cada
+   * uno de sí mismo, si no hay Capataz en la mesa) con el comando
+   * `asignar_esfuerzo`, independiente de la boleta: no hace falta haber
+   * bloqueado ruta y raciones para asignar esfuerzo, ni al revés.
+   * `undefined` hasta que se manda el primer `asignar_esfuerzo` de la noche.
+   */
+  esfuerzoAsignado?: JugadorId[];
+  /**
+   * Quiénes ya mandaron su `asignar_esfuerzo` esta noche.
+   *
+   * No se puede derivar de `esfuerzoAsignado`: alguien que se ofreció y alguien
+   * que dijo que no dejan la lista igual, y el Capataz que reparte "a nadie"
+   * manda una lista vacía. Sin este registro, el celular no puede saber si ya
+   * respondió y tiene que recordarlo en estado local — que se pierde al
+   * recargar y contradice D4 (el estado vive en el servidor).
+   */
+  esfuerzoRespondieron?: JugadorId[];
   /** Marca de tiempo del servidor en la que vence la ventana de decisión. */
   venceEn: number;
 }
@@ -83,8 +101,6 @@ export interface EstadoNoche {
 export interface Boleta {
   ruta: TramoId;
   raciones: NivelRaciones;
-  /** A quiénes manda al trabajo pesado. Puede ser a sí mismo. */
-  esfuerzo: JugadorId[];
   bloqueadaEn: number;
 }
 
@@ -97,6 +113,34 @@ export interface DecisionNoche {
   esfuerzo: JugadorId[];
   /** Cómo se resolvió: sirve para la crónica y para explicar el resultado en la TV. */
   via: 'mayoria' | 'desempate_capataz' | 'capataz_solo' | 'oposicion_unanime' | 'vencio_el_tiempo';
+}
+
+/**
+ * Lo que se revela en el fogón (D18): quién votó qué, con nombre, y cómo se
+ * resolvió. Se computa en `resolverNoche()` con los nombres ya resueltos a
+ * texto — no se deriva de `nocheActual.boletas` en la proyección, porque al
+ * pasar de `resolver` a `epilogo` la máquina borra `nocheActual` entero
+ * (ver el destructuring en `maquina.ts`), y la última noche tiene que poder
+ * revelarse igual.
+ */
+export interface RevelacionBoletas {
+  noche: number;
+  ruta: { nombre: string; votantes: string[]; gano: boolean }[];
+  raciones: { nivel: NivelRaciones; votantes: string[]; gano: boolean }[];
+  /** Nombres de quienes fueron al trabajo pesado. */
+  esfuerzo: string[];
+  /**
+   * Nombre del Capataz, solo si efectivamente repartió esta noche. Si no hay
+   * Capataz en la mesa (esfuerzo voluntario) o no llegó a repartir, no va:
+   * ponerlo igual haría que la TV le atribuyera un reparto que no hizo.
+   */
+  repartio?: string;
+  /**
+   * Cómo se resolvió **la ruta**. Raciones se cuenta por separado y tiene su
+   * propio desempate (03-reglas-de-resolucion.md § Conteo de boletas), así que
+   * esto no se puede mostrar como si aplicara a las dos dimensiones.
+   */
+  via: DecisionNoche['via'];
 }
 
 /** Una línea de la crónica. Es el producto real de la partida: la anécdota. */
@@ -130,6 +174,19 @@ export interface EstadoPartida {
   cronica: EntradaCronica[];
   /** A quién se le ofreció el trato esta travesía, si a alguien. */
   tratoOfrecidoA?: JugadorId;
+  /**
+   * Quiénes fueron al trabajo pesado la noche anterior. No se puede mandar a
+   * la misma persona dos noches seguidas (D19): esto es lo que hace esa regla
+   * cumplible sin tener que releer la crónica entera. Vacío al crear la
+   * partida y se reescribe entero al cerrar cada noche.
+   */
+  esfuerzoNocheAnterior: JugadorId[];
+  /**
+   * Lo que se reveló al cerrar la última noche resuelta: quién votó qué y a
+   * quién se mandó al esfuerzo (D18). Sobrevive el pasaje a `epilogo` a
+   * propósito — ver `RevelacionBoletas`.
+   */
+  ultimaRevelacion?: RevelacionBoletas;
   /** Se llena en el epílogo. */
   desenlace?: Desenlace;
 }

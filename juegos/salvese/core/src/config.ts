@@ -3,8 +3,8 @@
  *
  * Todo lo de acá está sin calibrar: son los valores de arranque para que el motor
  * corra, no verdades de diseño. Se ajustan jugando. Lo que NO se cambia sin pasar
- * por decisiones.md son las formas: cinco noches, tres decisiones, 10 segundos de
- * celular por ronda.
+ * por decisiones.md son las formas: cinco noches, dos decisiones más el reparto
+ * del esfuerzo (D19), 10 segundos de celular por ronda.
  */
 
 export const LIMITES = {
@@ -22,7 +22,8 @@ export const TIEMPOS = {
   /** Desde acá la TV muestra dígitos. Antes solo se ve la llama bajar. */
   decidirDigitosMs: 15_000,
   resolverMs: 7_000,
-  fogonMs: 15_000,
+  /** 30 s: es el fogón que revela las boletas (D18), no una pantalla muda. */
+  fogonMs: 30_000,
   /** Pulso de un gatillo de alerta: objeto, quiebre o perro (08-cliente-tv.md). */
   alertaMs: 1_500,
   /** Presupuesto de la llamada al modelo dentro de la cutscene. Si vence, va el respaldo. */
@@ -33,6 +34,20 @@ export const TIEMPOS = {
 export function ventanaDecidirMs(noche: number): number {
   const factor = noche <= 2 ? 1 : noche === 5 ? 0.6 : 0.75;
   return Math.round(TIEMPOS.decidirBaseMs * factor);
+}
+
+/**
+ * ¿Se reparte el trabajo pesado esta noche? En la noche 1 no: el celular no
+ * ofrece opciones, dicta la línea, y se decide una sola cosa (D8). Desde la 2 sí.
+ *
+ * Vive acá y no en cada lado porque la proyección (qué acción se ofrece) y el
+ * motor (si el atajo de "todos bloquearon" espera al Capataz) TIENEN que estar
+ * de acuerdo. Cuando no lo estaban, la noche 1 con Capataz en la mesa no
+ * resolvía nunca por atajo: los cinco bloqueaban en veinte segundos y se
+ * quedaban esperando los otros setenta.
+ */
+export function hayRepartoDeEsfuerzo(noche: number): boolean {
+  return noche > 1;
 }
 
 /** Vigor de un viajero. 0 es quebrado: no aporta esfuerzo y arrastra al grupo. */

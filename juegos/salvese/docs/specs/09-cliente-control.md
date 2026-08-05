@@ -55,6 +55,34 @@ perdió la mesa.**
 Las habilidades se abren de a una hasta la noche 3, así que las pantallas nuevas
 aparecen espaciadas y ninguna necesita explicación.
 
+## El reparto del esfuerzo
+
+`repartir_esfuerzo` (D19) es una pantalla de selección múltiple —hasta 3, con un
+botón de confirmar— independiente de la boleta: no hace falta haber bloqueado ruta
+y raciones para verla, ni al revés. Se le ofrece al Capataz si hay uno en la mesa;
+si no, a **cada** jugador, con `modo: 'voluntario'` y una sola opción, él mismo.
+
+Los que no se pueden elegir —fueron la noche anterior, o están quebrados— se
+muestran igual, deshabilitados con su motivo (`disponible: false, motivo: '...'`)
+en vez de desaparecer: que se vea por qué no se puede es parte de la conversación,
+no algo para esconder.
+
+**En la noche 1 esta pantalla no existe**: no se reparte esfuerzo (D8, se decide
+una sola cosa) y el servidor rechaza el comando además de no ofrecer la acción.
+
+### Que ya repartió lo dice el servidor, no el celular
+
+La acción trae `yaReparti` y `yaAsignado`, y el cliente pinta a partir de eso:
+`yaReparti` decide si la pantalla se fuerza, `yaAsignado` precarga la selección.
+Nada de estado local (D4).
+
+Con un `useState` en el celular parecía funcionar y se rompía al recargar: se
+perdía el "ya repartí", el servidor seguía ofreciendo la acción, y el Capataz
+volvía a ver la pantalla de reparto a mitad de la noche pudiendo pisar sin querer
+lo que ya había decidido. `yaReparti` tampoco se puede derivar de `yaAsignado`:
+repartir "a nadie" y todavía no haber repartido son los dos una lista vacía, y por
+eso `EstadoNoche` lleva `esfuerzoRespondieron` aparte.
+
 ## Bloquear es definitivo
 
 `elegir` se puede mandar muchas veces; `bloquear` cierra la boleta y no se

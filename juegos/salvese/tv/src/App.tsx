@@ -19,7 +19,7 @@ interface JugadorEnSala {
 import { JuegoTV } from './JuegoTV.js';
 
 export function App() {
-  const { estado, ultimo, mandar } = useConexion();
+  const { estado, ultimo, mandar, desactualizado } = useConexion();
   const [codigo, setCodigo] = useState<string | null>(null);
   const [jugadores, setJugadores] = useState<JugadorEnSala[]>([]);
   const [qrUrl, setQrUrl] = useState<string | null>(null);
@@ -54,6 +54,20 @@ export function App() {
       setQrUrl(null);
     }
   }, [codigo]);
+
+  // Recargarse solo ya se intentó una vez en `conexion.ts` y no alcanzó: acá el
+  // problema no es el caché, así que se dice y no se reintenta en loop. Se lee
+  // a 3 metros, como todo lo de la TV.
+  if (desactualizado) {
+    return (
+      <main className="pantalla pantalla-sala">
+        <p className="al-pie" style={{ fontSize: '4vh', marginBottom: '1.5vh' }}>
+          El servidor se actualizó
+        </p>
+        <p className="al-pie">Recargá esta pantalla para seguir jugando.</p>
+      </main>
+    );
+  }
 
   if (estado !== 'abierta') {
     return (

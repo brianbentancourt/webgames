@@ -55,6 +55,30 @@ interpolar entre mensajes.
 pierde esa herramienta y la cutscene deja de ser un respiro. Todo lo dramático se
 guarda para la resolución.
 
+## El fogón revela las boletas
+
+`panel-fogon` es el contenido propio del fogón (D18), no un texto de relleno: dos
+columnas —ruta y raciones— con quién votó qué, con nombre, y la opción ganadora
+marcada; abajo, a quién se mandó al esfuerzo y quién repartió, si hubo Capataz
+(D19). Sale de `vista.revelacion`, que solo llega poblado en `fase === 'fogon'` y
+en `epilogo`. Mismas reglas de legibilidad a 3 metros que el resto: tipografía
+grande, sin scroll, todo en una pantalla.
+
+`TIEMPOS.fogonMs` es 30 segundos, no 15: alcanza para leer la revelación completa y
+para que alguien diga *"¡vos dijiste que ibas al río!"* antes de que se apague.
+
+**El epílogo pinta la misma revelación**, en su variante `revelacion-compacta`
+bajo el título "La última noche". No es un extra: cuando la travesía termina, la
+máquina va de `resolver` **directo a `epilogo` salteando `fogon``**, así que la
+boleta de la última noche —la 5, la que el Capataz decide solo (`capataz_solo`)—
+o se muestra ahí o no se muestra en ninguna parte. Es exactamente el motivo por el
+que `ultimaRevelacion` vive en `EstadoPartida` y no se deriva de `nocheActual`,
+que para entonces ya no existe.
+
+`panel-epilogo` tiene fondo propio como `panel-fogon`. Sin él las tarjetas de
+objetivos caen encima de la fogata con 3+ jugadores (era el bug de layout de
+M3.5), y con la revelación adentro el panel es más alto todavía.
+
 ## Los gatillos
 
 La TV se entera de que tiene que animar por `vista.gatillos`, no comparando estados.

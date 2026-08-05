@@ -10,7 +10,21 @@ import { z } from 'zod';
 import type { JugadorId, SalaId } from './ids.js';
 import type { VistaJugador, VistaTV } from './vistas.js';
 
-export const VERSION_PROTOCOLO = 1;
+/**
+ * Se sube cuando un cliente viejo deja de funcionar contra un servidor nuevo:
+ * un mensaje que se va, un campo obligatorio que aparece, una `Accion` que
+ * cambia de forma. No hace falta subirla para agregar campos opcionales.
+ *
+ * El cliente compara contra la `version` de `bienvenida` y, si no coincide, se
+ * recarga solo (`conexion.ts`). Sin eso, un celular con la página abierta
+ * durante un deploy reconecta el socket con el JS viejo en memoria y queda en
+ * una pantalla muda: el socket anda, el servidor es nuevo, el cliente no
+ * entiende lo que le llega y no hay ningún error visible.
+ *
+ * 2 — D18/D19: se fue `elegir_esfuerzo` y la boleta perdió `esfuerzo`; llegó
+ *     `asignar_esfuerzo` y la acción `repartir_esfuerzo`.
+ */
+export const VERSION_PROTOCOLO = 2;
 
 /* ------------------------------------------------------------------ */
 /* cliente → servidor                                                  */
@@ -35,10 +49,15 @@ export const MensajeEntranteSchema = z.discriminatedUnion('t', [
     t: z.literal('elegir'),
     ruta: z.string().optional(),
     raciones: nivelRaciones.optional(),
-    esfuerzo: z.array(z.string()).max(10).optional(),
   }),
   /** Cierra la boleta. A partir de acá no se cambia: se bloquea en secreto. */
   z.object({ t: z.literal('bloquear') }),
+  /**
+   * A quiénes manda al trabajo pesado esta noche (D19). Del Capataz si lo hay
+   * en la mesa; si no, cada uno solo puede mandarse a sí mismo. Independiente
+   * de `elegir`/`bloquear`: no depende de la boleta ni al revés.
+   */
+  z.object({ t: z.literal('asignar_esfuerzo'), a: z.array(z.string()).max(3) }),
   z.object({ t: z.literal('responder_trato'), acepta: z.boolean() }),
   z.object({ t: z.literal('entregar_objeto'), objeto: z.string(), a: z.string() }),
   z.object({ t: z.literal('quitar_jugador'), jugador: z.string() }),
@@ -78,6 +97,30 @@ export type CodigoError =
   | 'jugada_invalida'
   | 'version_incompatible'
   | 'mensaje_ilegible';
+
+/** Marca de "ya me recargué por esto", para no entrar en un loop de recargas. */
+export const CLAVE_REINTENTO_VERSION = 'salvese.recargado-por-version';
+
+/**
+ * Qué hacer cuando llega la `bienvenida`: seguir, recargarse para bajar el
+ * cliente nuevo, o rendirse y avisarle a la persona.
+ *
+ * Recargar alcanza porque el servidor manda `index.html` con `no-cache` y los
+ * assets de Vite llevan hash (`estaticos.ts`): un reload común ya baja el
+ * bundle nuevo. Se intenta **una sola vez** — si después de recargar la versión
+ * sigue sin coincidir, el problema no es el caché y recargar en loop solo
+ * esconde el error.
+ *
+ * Vive acá y no en cada cliente para que la TV y el celular no puedan
+ * discrepar sobre qué versión es compatible.
+ */
+export function decidirPorVersion(
+  versionServidor: number,
+  yaSeRecargo: boolean,
+): 'seguir' | 'recargar' | 'rendirse' {
+  if (versionServidor === VERSION_PROTOCOLO) return 'seguir';
+  return yaSeRecargo ? 'rendirse' : 'recargar';
+}
 
 /** Parseo defensivo: nunca lanza, devuelve el error como valor. */
 export function leerEntrante(

@@ -11,11 +11,13 @@ EstadoPartida
 ├─ avance / distanciaTotal        ← dónde va la caravana
 ├─ recurso / capacidad            ← raciones o agua, según el tablero
 ├─ viajeros[]                     ← rol, vigor, objetivo secreto, objeto
-├─ perro                          ← lo único público
+├─ perro                          ← lo único público en vivo
 ├─ objetos[]                      ← máximo 4 activos, todos se degradan
-├─ nocheActual?                   ← candidatos, boletas, vencimiento
+├─ nocheActual?                   ← candidatos, boletas, esfuerzo asignado, vencimiento
 ├─ cronica[]                      ← una entrada por noche
 ├─ tratoOfrecidoA?
+├─ esfuerzoNocheAnterior          ← quién fue anoche: no se repite (D19)
+├─ ultimaRevelacion?              ← quién votó qué la última noche resuelta (D18)
 └─ desenlace?                     ← se llena en el epílogo
 ```
 
@@ -33,10 +35,20 @@ La información oculta es el juego. Estos campos **nunca** salen del servidor:
 | `viajero.vigor` (el número) | Nadie. Afuera sale como `aspecto` cualitativo |
 | `viajero.aceptoElTrato` | El que aceptó, y recién en el epílogo |
 | `tramo.dureza`, `costoRecurso`, `hallazgo` | El Baqueano, de **un** tramo, como texto |
-| `boletas` | Nadie hasta que resuelve la noche |
+| `nocheActual.boletas` | Nadie hasta que resuelve la noche |
+| `nocheActual.esfuerzoAsignado` | Nadie hasta que resuelve la noche (D19: sigue el mismo desfasaje que la boleta). Excepción acotada: el Capataz ve **su propio** reparto en `repartir_esfuerzo.yaAsignado`, y en modo voluntario cada uno ve solo si está él |
+| `nocheActual.esfuerzoRespondieron` | Cada jugador ve solo si él ya respondió (`yaReparti`). Existe aparte porque repartir "a nadie" y no haber repartido son los dos una lista vacía |
+| `ultimaRevelacion` | **Todos**, pero recién en `fogon` y `epilogo` (D18) — antes es tan secreto como la boleta de la que sale |
 | `perro.dice_la_verdad` | Nadie, nunca. Ni en el epílogo |
 | `objeto.arquetipo` si no está identificado | Nadie |
 | `semilla` | Nadie durante la partida |
+
+**Las boletas son secretas *durante* la noche y públicas *después* (D18, D19).**
+Es la única excepción al patrón "esto nunca sale del servidor": `resolverNoche()`
+computa `RevelacionBoletas` —quién votó qué, con nombre, y a quién se mandó al
+esfuerzo— y la guarda en `ultimaRevelacion`. `proyectarTV()` la expone únicamente
+si `fase` es `fogon` o `epilogo`; en cualquier otra fase el campo no sale, ni
+siquiera si ya existe en el estado. `proyectarJugador()` no la expone nunca.
 
 La proyección está en [05 · Vistas por rol](05-vistas-por-rol.md). La regla que
 sostiene todo esto: **si un cliente tuviera que decidir qué no mostrar, alcanzaría
@@ -55,11 +67,12 @@ se rompe, es bug del motor, no jugada rara.
 | I4 | Como máximo 4 objetos activos en la partida (`D11`) |
 | I5 | Todo objeto con `usosRestantes = 0` sale de `objetos[]` al cerrar la noche |
 | I6 | La cantidad y los roles de `viajeros` coinciden con `REPARTO[n]` |
-| I7 | `boletas` sólo tiene entradas durante la fase `decidir` |
+| I7 | `nocheActual.boletas` y `nocheActual.esfuerzoAsignado` sólo se llenan durante la fase `decidir`; `VistaTV.revelacion` sólo sale en `fogon` y `epilogo` |
 | I8 | `cronica.length === noche` una vez cerrado el fogón de esa noche |
 | I9 | `avance` nunca decrece |
 | I10 | Todo azar salió del `Rng` de la semilla: `Math.random()` no aparece fuera de `rng.ts` |
 | I11 | `tratoOfrecidoA` se escribe a lo sumo una vez por travesía (`D9`) |
+| I12 | Ningún id de `esfuerzoNocheAnterior` puede aparecer en el `esfuerzoAsignado` de la noche siguiente (`D19`) |
 
 ## Por qué el vigor no viaja como número
 

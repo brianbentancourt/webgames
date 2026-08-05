@@ -6,10 +6,10 @@
  */
 
 import type { JugadorId, ObjetoId, TramoId } from './ids.js';
-import type { EntradaCronica, Fase, NivelRaciones, Vigor, EstadoPartida } from './estado.js';
+import type { EntradaCronica, Fase, NivelRaciones, Vigor, EstadoPartida, RevelacionBoletas, Viajero } from './estado.js';
 import type { Rol } from './roles.js';
 import { FICHAS } from './roles.js';
-import { TIEMPOS, ventanaDecidirMs } from './config.js';
+import { TIEMPOS, ventanaDecidirMs, AVANCE, hayRepartoDeEsfuerzo } from './config.js';
 import { crearRng } from './rng.js';
 
 /** Lo que se pinta en la TV. Todo esto es público por definición. */
@@ -35,6 +35,14 @@ export interface VistaTV {
   gatillos: Gatillo[];
   /** Se llena recién en `epilogo`. La revelación reinterpreta la partida entera. */
   desenlace?: DesenlacePublico;
+  /**
+   * Quién votó qué la última noche resuelta, y cómo se resolvió (D18).
+   * CRÍTICO: solo va en la vista si `fase` es `fogon` o `epilogo`. Es
+   * información secreta durante `decidir` — si se filtrara antes, cualquiera
+   * podría leer la TV y el juego de información oculta se termina. Ver
+   * `proyectarTV()`.
+   */
+  revelacion?: RevelacionBoletas;
 }
 
 export interface DesenlacePublico {
@@ -84,7 +92,7 @@ export interface VistaJugador {
   /** Qué puede hacer ahora. Vacío = no le toca; la pantalla dice "hablá". */
   acciones: Accion[];
   /** Su boleta actual, si ya bloqueó. */
-  boleta?: { ruta: TramoId; raciones: NivelRaciones; esfuerzo: JugadorId[] };
+  boleta?: { ruta: TramoId; raciones: NivelRaciones };
   /** Solo para el destinatario del trato, y solo esa noche (D9). */
   trato?: { texto: string; costo: string };
 }
@@ -100,11 +108,36 @@ export type Accion =
   | { tipo: 'elegir_ruta'; opciones: { id: TramoId; nombre: string; pista: string }[] }
   | { tipo: 'elegir_raciones'; opciones: NivelRaciones[] }
   /**
-   * Nombres, no solo ids: la vista es autocontenida (D4), así que el cliente
-   * no necesita reconstruir un mapa id→nombre a partir de mensajes previos de
-   * la sala para poder mostrar quién es quién.
+   * A quiénes manda al trabajo pesado esta noche (D19). Del Capataz si hay uno
+   * en la mesa (`modo: 'capataz'`); si no, cada uno recibe la suya propia con
+   * una sola opción —él mismo— (`modo: 'voluntario'`). Independiente de la
+   * boleta: se puede mandar antes, después o sin haber bloqueado ruta ni
+   * raciones.
+   *
+   * `opciones` trae nombres, no solo ids (D4, vista autocontenida), y a los
+   * que no se pueden elegir los trae igual con `disponible: false` y un
+   * `motivo` legible: el celular los muestra deshabilitados, no los esconde,
+   * porque que se vea por qué no se puede es parte de la conversación.
+   *
+   * `yaReparti` y `yaAsignado` son lo que hace que esto sobreviva a recargar
+   * el celular: sin ellos el cliente tiene que recordar en estado local que ya
+   * respondió, se pierde al recargar y vuelve a pedir el reparto (D4 — el
+   * estado vive en el servidor, el cliente solo pinta).
    */
-  | { tipo: 'elegir_esfuerzo'; opciones: { id: JugadorId; nombre: string }[]; max: number }
+  | {
+      tipo: 'repartir_esfuerzo';
+      modo: 'capataz' | 'voluntario';
+      opciones: { id: JugadorId; nombre: string; disponible: boolean; motivo?: string }[];
+      max: number;
+      /** Si este jugador ya mandó su reparto esta noche. Puede cambiarlo igual. */
+      yaReparti: boolean;
+      /**
+       * Lo ya asignado que este jugador puede ver: la lista entera si es el
+       * Capataz (es su propia decisión), y solo si está él mismo en modo
+       * voluntario — que otro se haya ofrecido es secreto hasta el fogón (I7).
+       */
+      yaAsignado: JugadorId[];
+    }
   | { tipo: 'bloquear' }
   | { tipo: 'responder_trato' }
   | { tipo: 'entregar_objeto'; objeto: ObjetoId; candidatos: { id: JugadorId; nombre: string }[] }
@@ -287,7 +320,31 @@ export function proyectarTV(
       ? { ultimaCronica: estado.cronica[estado.cronica.length - 1] }
       : {}),
     ...(desenlace ? { desenlace } : {}),
+    // CRÍTICO: solo en `fogon` o `epilogo`. Las boletas son secretas mientras
+    // se decide (D18) — si esto saliera en `decidir`, cualquiera podría leer
+    // en la TV quién votó qué antes de que termine la ventana de discusión.
+    ...(estado.ultimaRevelacion && (estado.fase === 'fogon' || estado.fase === 'epilogo')
+      ? { revelacion: estado.ultimaRevelacion }
+      : {}),
   };
+}
+
+/**
+ * Una opción del celu para `repartir_esfuerzo`. Los que no se pueden elegir
+ * van igual, deshabilitados con un motivo legible: que se vea por qué no se
+ * puede es parte de la conversación (D19), no algo para esconder.
+ */
+function opcionEsfuerzo(
+  v: Viajero,
+  esfuerzoNocheAnterior: JugadorId[],
+): { id: JugadorId; nombre: string; disponible: boolean; motivo?: string } {
+  if (v.vigor === 0) {
+    return { id: v.id, nombre: v.nombre, disponible: false, motivo: 'está quebrado' };
+  }
+  if (esfuerzoNocheAnterior.includes(v.id)) {
+    return { id: v.id, nombre: v.nombre, disponible: false, motivo: 'fue anoche' };
+  }
+  return { id: v.id, nombre: v.nombre, disponible: true };
 }
 
 function curanderaEstado(vigor: Vigor): string {
@@ -378,7 +435,9 @@ export function proyectarJugador(
       } else if (yo.rol === 'capataz') {
         revelacion = {
           tipo: 'mando',
-          texto: 'Sos el Capataz. Tenés el voto decisivo en caso de empate. En la noche 5 decidís vos solo.',
+          texto:
+            'Sos el Capataz. Repartís quién va al trabajo pesado todas las noches, ' +
+            'tenés el voto decisivo en caso de empate y en la noche 5 decidís vos solo.',
         };
       }
     }
@@ -400,37 +459,68 @@ export function proyectarJugador(
   const boletaExistente = estado.nocheActual?.boletas[jugadorId];
   const otrosJugadores = estado.viajeros.filter((v) => v.id !== jugadorId);
 
-  if (enDecidir && !boletaExistente && estado.nocheActual) {
-    if (linea) {
-      // Si tiene línea de tutorial, solo puede bloquear
-      acciones = [{ tipo: 'bloquear' }];
-    } else {
-      acciones = [
-        {
-          tipo: 'elegir_ruta',
-          opciones: estado.nocheActual.candidatos.map((c) => ({
-            id: c.id,
-            nombre: c.nombre,
-            pista: c.pista,
-          })),
-        },
-        {
-          tipo: 'elegir_raciones',
-          opciones: ['ajustado', 'normal', 'abundante'],
-        },
-        {
-          tipo: 'elegir_esfuerzo',
-          opciones: estado.viajeros
-            .filter((v) => v.vigor > 0)
-            .map((v) => ({ id: v.id, nombre: v.nombre })),
-          max: 3,
-        },
-        { tipo: 'bloquear' },
-      ];
+  if (enDecidir && estado.nocheActual) {
+    if (!boletaExistente) {
+      if (linea) {
+        // Si tiene línea de tutorial, solo puede bloquear (D8: una sola
+        // decisión en la noche 1, nada de repartir esfuerzo tampoco).
+        acciones = [{ tipo: 'bloquear' }];
+      } else {
+        acciones = [
+          {
+            tipo: 'elegir_ruta',
+            opciones: estado.nocheActual.candidatos.map((c) => ({
+              id: c.id,
+              nombre: c.nombre,
+              pista: c.pista,
+            })),
+          },
+          {
+            tipo: 'elegir_raciones',
+            opciones: ['ajustado', 'normal', 'abundante'],
+          },
+          { tipo: 'bloquear' },
+        ];
+      }
+
+      if (estado.tratoOfrecidoA === jugadorId && !yo.aceptoElTrato) {
+        acciones.push({ tipo: 'responder_trato' });
+      }
     }
 
-    if (estado.tratoOfrecidoA === jugadorId && !yo.aceptoElTrato) {
-      acciones.push({ tipo: 'responder_trato' });
+    // El reparto del esfuerzo es independiente de la boleta (D19): se ofrece
+    // aunque ya se haya bloqueado ruta y raciones. En la noche 1 no se reparte
+    // (D8, una sola decisión) y esa condición sale del mismo helper que usa el
+    // motor para decidir si el atajo de "todos bloquearon" espera al Capataz:
+    // si las dos no coinciden, la noche 1 no resuelve nunca por atajo.
+    if (hayRepartoDeEsfuerzo(estado.noche)) {
+      const respondieron = estado.nocheActual.esfuerzoRespondieron ?? [];
+      const asignados = estado.nocheActual.esfuerzoAsignado ?? [];
+      const capatazEnMesa = estado.viajeros.find((v) => v.rol === 'capataz');
+      if (capatazEnMesa) {
+        if (yo.rol === 'capataz') {
+          acciones.push({
+            tipo: 'repartir_esfuerzo',
+            modo: 'capataz',
+            opciones: estado.viajeros.map((v) => opcionEsfuerzo(v, estado.esfuerzoNocheAnterior)),
+            max: AVANCE.esfuerzoMax,
+            yaReparti: respondieron.includes(yo.id),
+            yaAsignado: asignados,
+          });
+        }
+      } else {
+        // Sin Capataz en la mesa, cada uno se ofrece solo a sí mismo (D19).
+        // `yaAsignado` se filtra a uno mismo: que otro se haya ofrecido es
+        // secreto hasta el fogón, igual que la boleta (I7).
+        acciones.push({
+          tipo: 'repartir_esfuerzo',
+          modo: 'voluntario',
+          opciones: [opcionEsfuerzo(yo, estado.esfuerzoNocheAnterior)],
+          max: 1,
+          yaReparti: respondieron.includes(yo.id),
+          yaAsignado: asignados.filter((id) => id === yo.id),
+        });
+      }
     }
   } else if (enAcampar) {
     if (yo.objeto) {

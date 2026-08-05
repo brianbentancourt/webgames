@@ -25,6 +25,20 @@ alcanza para decidir, y por eso hay que hablar (`diseno.md` § Pilares).
 | **Capataz** | Nada | Nada | `{ tipo: 'mando' }` — tiene poder, no información |
 | **Pasajero** | Nada | — | ninguna. Tiene voto y objetivo propio |
 
+El Capataz no tiene revelación de información, pero sí una **acción** que no es del
+resto: `repartir_esfuerzo`. Todas las noches (no solo en empates y en la noche 5)
+nombra hasta 3 viajeros para el trabajo pesado, con el comando `asignar_esfuerzo`
+(D19). Es independiente de la boleta y del resto de las acciones, y **no se ofrece
+en la noche 1** (D8: se decide una sola cosa). Si no hay Capataz en la mesa (2 y 3
+jugadores), esa misma acción se le ofrece a **cada** jugador en `modo: 'voluntario'`,
+con una sola opción: él mismo, y `max: 1`.
+
+La acción lleva además `yaReparti` y `yaAsignado`, que es lo que hace que el
+reparto sobreviva a recargar el celular sin estado local (D4). `yaAsignado` está
+proyectado como todo lo demás: el Capataz ve la lista entera —es su propia
+decisión— y en modo voluntario cada uno ve **solo si está él**, porque que otro se
+haya ofrecido es secreto hasta el fogón igual que la boleta (I7).
+
 El Despensero es el único que ve números y eso es a propósito: es el contrapeso
 exacto de la Curandera. Uno puede dictar una cifra en voz alta y que le crean o no;
 la otra no tiene cifra que dictar. Esa asimetría es lo que hace que las dos
@@ -69,7 +83,9 @@ cegado: enterarse de que el Baqueano no vio nada tiene que costar una pregunta.
    desde el reparto: si está en el JSON, está a un inspector de distancia del resto.
 2. **Los números salen convertidos.** `vigor` sale como `aspecto` con
    `aspectoDeVigor()`, que es el único lugar donde se hace esa conversión.
-3. **Las boletas ajenas no salen.** Sólo si un jugador bloqueó o no.
+3. **Las boletas ajenas no salen mientras se juega.** Sólo si un jugador bloqueó o
+   no, y lo mismo para `esfuerzoAsignado`: recién se sabe quién votó qué y a quién
+   se mandó al esfuerzo cuando `ultimaRevelacion` llega a la TV en el fogón (D18).
 4. **`acciones` vacío es información**: significa "no te toca, hablá". El celular
    apagado es una pantalla válida y buscada.
 5. **Una vista, un jugador.** Nunca se manda la misma `VistaJugador` a dos sockets,
@@ -90,3 +106,15 @@ reloj de los últimos 30 segundos, sin nada que haya que leer para entender.
 Los `gatillos` son la única forma en que la TV se entera de que tiene que animar.
 El cliente nunca decide solo (`D4`): si comparara estados para detectar cambios,
 una reconexión dispararía la cutscene de una noche que ya pasó.
+
+## La revelación del fogón
+
+`VistaTV.revelacion` es la única excepción a "todo público por definición": es
+secreta mientras se juega y pública recién después (D18). `proyectarTV()` la
+incluye **únicamente** si `fase` es `fogon` o `epilogo`; en cualquier otra fase el
+campo no sale, aunque el estado ya tenga `ultimaRevelacion` calculado. Si esto se
+filtrara durante `decidir`, cualquiera que mire la TV rompe el juego de información
+oculta: leería quién va a votar qué antes de que se cierre la boleta de nadie.
+
+`proyectarJugador()` no expone `ultimaRevelacion` en ningún momento: es una vista
+de la TV, no del celular.

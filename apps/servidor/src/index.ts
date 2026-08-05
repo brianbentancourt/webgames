@@ -204,6 +204,7 @@ function iniciarPartidaReal(sala: Sala, viajeros: Asiento[]) {
     perro: { presente: true, alerta: 'ninguna', dice_la_verdad: true },
     objetos: [],
     cronica: [],
+    esfuerzoNocheAnterior: [],
   };
 
   let res = reducir(estadoPartida, {
@@ -329,7 +330,13 @@ wss.on('connection', (socket) => {
           jugador: asiento.id,
           ruta: msg.ruta as any,
           raciones: msg.raciones as any,
-          esfuerzo: msg.esfuerzo as any,
+        };
+      } else if (msg.t === 'asignar_esfuerzo') {
+        if (asiento === undefined) return;
+        comandoPartida = {
+          t: 'asignar_esfuerzo',
+          jugador: asiento.id,
+          a: msg.a as any,
         };
       } else if (msg.t === 'bloquear') {
         if (asiento === undefined) return;

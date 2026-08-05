@@ -63,6 +63,7 @@ async function main() {
     perro: { presente: true, alerta: 'ninguna', dice_la_verdad: true },
     objetos: [],
     cronica: [],
+    esfuerzoNocheAnterior: [],
   };
 
   // Crear la partida
@@ -109,8 +110,42 @@ async function main() {
         console.log(`  [${index}] ${c.nombre} (Pista: "${c.pista}")`);
       });
 
+      // El reparto del esfuerzo es independiente de la boleta (D19). Se pide
+      // primero: si no hay Capataz en la mesa, la noche se resuelve apenas
+      // todos bloquean, así que pedirlo después se lo comería el atajo.
+      const capataz = estado.viajeros.find((v) => v.rol === 'capataz');
+      if (capataz) {
+        console.log(`\n--- El Capataz (${capataz.nombre}) reparte el trabajo pesado ---`);
+        estado.viajeros.forEach((v, index) => {
+          console.log(`  [${index}] ${v.nombre} (Vigor: ${v.vigor})`);
+        });
+        const ansEsf = await rl.question(
+          'A quién manda al trabajo pesado (índices separados por comas, hasta 3, o nada): ',
+        );
+        const a = ansEsf.trim()
+          ? ansEsf
+              .split(',')
+              .map((idx) => estado.viajeros[parseInt(idx.trim())]?.id)
+              .filter((id): id is NonNullable<typeof id> => id !== undefined)
+          : [];
+        r = reducir(estado, { t: 'asignar_esfuerzo', jugador: capataz.id, a: a as any });
+        if (r.ok) estado = r.transicion.estado;
+      } else {
+        console.log('\n--- Sin Capataz en la mesa: el esfuerzo es voluntario ---');
+        for (const jugador of estado.viajeros) {
+          const ans = await rl.question(
+            `${jugador.nombre} (vigor ${jugador.vigor}), ¿te ofrecés al trabajo pesado? (s/n): `,
+          );
+          const a = jugador.vigor > 0 && ans.trim().toLowerCase().startsWith('s') ? [jugador.id] : [];
+          r = reducir(estado, { t: 'asignar_esfuerzo', jugador: jugador.id, a: a as any });
+          if (r.ok) estado = r.transicion.estado;
+        }
+      }
+
       // Votos de cada jugador
       for (const jugador of estado.viajeros) {
+        if (estado.fase !== 'decidir') break; // el reparto de arriba puede haber resuelto la noche
+
         console.log(`\n--- Turno de ${jugador.nombre} (${jugador.rol}) ---`);
         const vista = proyectarJugador(estado, jugador.id);
 
@@ -136,27 +171,12 @@ async function main() {
         const ansRac = await rl.question('Elegí raciones (0-2): ');
         const raciones = (['ajustado', 'normal', 'abundante'] as const)[parseInt(ansRac) || 1]!;
 
-        // Selección de esfuerzo
-        const esfuerzo: typeof jugador.id[] = [];
-        console.log('Esfuerzo pesado (mandar viajeros a trabajar):');
-        estado.viajeros.forEach((v, index) => {
-          console.log(`  [${index}] ${v.nombre} (Vigor: ${v.vigor})`);
-        });
-        const ansEsf = await rl.question('Asignar a esfuerzo (índices separados por comas, ej: 0,1): ');
-        if (ansEsf.trim()) {
-          ansEsf.split(',').forEach((idx) => {
-            const v = estado.viajeros[parseInt(idx.trim())];
-            if (v && v.vigor > 0) esfuerzo.push(v.id);
-          });
-        }
-
         // Enviar elección
         r = reducir(estado, {
           t: 'elegir',
           jugador: jugador.id,
           ruta: rutaElegida,
           raciones,
-          esfuerzo,
         });
         if (r.ok) estado = r.transicion.estado;
 

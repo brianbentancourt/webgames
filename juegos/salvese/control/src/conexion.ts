@@ -7,6 +7,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { MensajeEntrante, MensajeSaliente } from '@salvese/core';
+import { decidirPorVersion, CLAVE_REINTENTO_VERSION } from '@salvese/core';
 
 export const URL_SERVIDOR: string =
   import.meta.env['VITE_SERVIDOR'] ??
@@ -21,6 +22,8 @@ const CLAVE_SESION = 'salvese.sesion';
 export function useConexion() {
   const [estado, setEstado] = useState<'conectando' | 'abierta' | 'cerrada'>('conectando');
   const [ultimo, setUltimo] = useState<MensajeSaliente | null>(null);
+  /** El servidor habla otra versión y recargarse no alcanzó. */
+  const [desactualizado, setDesactualizado] = useState(false);
   const socket = useRef<WebSocket | null>(null);
 
   useEffect(() => {
@@ -40,6 +43,26 @@ export function useConexion() {
       ws.onmessage = (ev) => {
         const msg = JSON.parse(ev.data as string) as MensajeSaliente;
         if (msg.t === 'bienvenida') {
+          // Un deploy a mitad de partida deja el celular con el JS viejo en
+          // memoria: el socket reconecta solo, el servidor ya es nuevo, y sin
+          // esto la pantalla queda muda sin ningún error visible.
+          const decision = decidirPorVersion(
+            msg.version,
+            sessionStorage.getItem(CLAVE_REINTENTO_VERSION) === '1',
+          );
+          if (decision === 'recargar') {
+            sessionStorage.setItem(CLAVE_REINTENTO_VERSION, '1');
+            location.reload();
+            return;
+          }
+          if (decision === 'rendirse') {
+            vivo = false;
+            setDesactualizado(true);
+            ws.close();
+            return;
+          }
+          sessionStorage.removeItem(CLAVE_REINTENTO_VERSION);
+
           if (msg.sesion !== undefined) {
             localStorage.setItem(CLAVE_SESION, msg.sesion);
           }
@@ -67,5 +90,11 @@ export function useConexion() {
     if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(mensaje));
   }, []);
 
-  return { estado, ultimo, mandar, sesionGuardada: () => localStorage.getItem(CLAVE_SESION) };
+  return {
+    estado,
+    ultimo,
+    mandar,
+    desactualizado,
+    sesionGuardada: () => localStorage.getItem(CLAVE_SESION),
+  };
 }
