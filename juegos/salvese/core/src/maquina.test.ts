@@ -3,7 +3,7 @@ import { reducir, registrarTablero, obtenerTablero } from './maquina.js';
 import { proyectarTV, proyectarJugador } from './vistas.js';
 import type { EstadoPartida, Comando, RevelacionBoletas } from './index.js';
 import { jugadorId, partidaId, tramoId } from './ids.js';
-import { AVANCE } from './config.js';
+import { AVANCE, TRATO } from './config.js';
 import { decidirPorVersion, VERSION_PROTOCOLO } from './protocolo.js';
 
 // Datos estáticos mínimos de un tablero para los tests sin depender de archivos de otro proyecto si hay problemas
@@ -724,6 +724,299 @@ describe('Cirugía 2 — El Capataz reparte el esfuerzo', () => {
 });
 
 /**
+ * A2 (D10): el perro se puede perder. Antes de esto la rama que lo hacía era
+ * código muerto (`decisionEsfuerzo.includes('perro')`, que nunca podía ser
+ * cierto porque el perro nunca estaba entre las opciones de esfuerzo), así
+ * que `presente` no podía valer `false` nunca.
+ */
+describe('A2 — El perro se puede perder', () => {
+  function estadoDecidirConCapataz(overrides: Partial<EstadoPartida> = {}): EstadoPartida {
+    return {
+      id: partidaId('partida-perro'),
+      tablero: 'la-sierra' as any,
+      semilla: 'test-perro',
+      fase: 'decidir',
+      noche: 3,
+      nochesTotales: 5,
+      avance: 0,
+      distanciaTotal: 24,
+      recurso: 30,
+      capacidad: 40,
+      viajeros: [
+        { id: jugadorId('j-1'), nombre: 'Nico', rol: 'baqueano', asiento: 0, vigor: 3, objetivo: 'llegar-entero' as any, conectado: true, cegado: false, aceptoElTrato: false },
+        { id: jugadorId('j-2'), nombre: 'Vale', rol: 'curandera', asiento: 1, vigor: 3, objetivo: 'que-nadie-quede' as any, conectado: true, cegado: false, aceptoElTrato: false },
+        { id: jugadorId('j-3'), nombre: 'Seba', rol: 'despensero', asiento: 2, vigor: 3, objetivo: 'sobre-raciones' as any, conectado: true, cegado: false, aceptoElTrato: false },
+        { id: jugadorId('j-4'), nombre: 'Cami', rol: 'capataz', asiento: 3, vigor: 3, objetivo: 'ver-el-final' as any, conectado: true, cegado: false, aceptoElTrato: false },
+      ],
+      perro: { presente: true, alerta: 'ninguna', dice_la_verdad: true },
+      objetos: [],
+      nocheActual: {
+        numero: 3,
+        candidatos: tableroTest.tramos as any,
+        boletas: {},
+        venceEn: Date.now() + 20000,
+      },
+      cronica: [],
+      esfuerzoNocheAnterior: [],
+      ...overrides,
+    };
+  }
+
+  const capataz = jugadorId('j-4');
+  const noCapataz = jugadorId('j-1');
+
+  test('Un no-Capataz no puede mandar al perro a explorar', () => {
+    const estado = estadoDecidirConCapataz();
+    const r = reducir(estado, { t: 'mandar_perro_a_explorar', jugador: noCapataz, manda: true });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.motivo).toBe('jugada_invalida');
+  });
+
+  test('No se puede mandar antes de la noche 3, aunque lo pida el Capataz', () => {
+    const estado = estadoDecidirConCapataz({ noche: 2 });
+    const r = reducir(estado, { t: 'mandar_perro_a_explorar', jugador: capataz, manda: true });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.motivo).toBe('jugada_invalida');
+  });
+
+  test('No se puede mandar a explorar a un perro que ya no está', () => {
+    const estado = estadoDecidirConCapataz({
+      perro: { presente: false, alerta: 'ninguna', dice_la_verdad: true },
+    });
+    const r = reducir(estado, { t: 'mandar_perro_a_explorar', jugador: capataz, manda: true });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.motivo).toBe('jugada_invalida');
+  });
+
+  test('No se puede mandar dos veces la misma noche', () => {
+    let estado = estadoDecidirConCapataz();
+    let r = reducir(estado, { t: 'mandar_perro_a_explorar', jugador: capataz, manda: true });
+    expect(r.ok).toBe(true);
+    if (r.ok) estado = r.transicion.estado;
+    expect(estado.nocheActual?.perroExplorando).toBe(true);
+
+    r = reducir(estado, { t: 'mandar_perro_a_explorar', jugador: capataz, manda: true });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.motivo).toBe('jugada_invalida');
+  });
+
+  /**
+   * "Que se quede" es una respuesta, no un silencio. Si el servidor no la
+   * registrara, el celular tendría que acordarse en estado local y la pantalla
+   * volvería al recargar el teléfono a mitad de la noche (D4).
+   */
+  test('Decir "que se quede" queda registrado y apaga la pantalla', () => {
+    let estado = estadoDecidirConCapataz();
+
+    const antes: any = proyectarJugador(estado, capataz).acciones.find(
+      (a) => a.tipo === 'mandar_perro',
+    );
+    expect(antes.yaDecidio).toBe(false);
+
+    const r = reducir(estado, { t: 'mandar_perro_a_explorar', jugador: capataz, manda: false });
+    expect(r.ok).toBe(true);
+    if (r.ok) estado = r.transicion.estado;
+
+    // Decidido pero NO explorando: son dos cosas distintas y por eso hacen
+    // falta dos campos.
+    expect(estado.nocheActual?.perroDecidido).toBe(true);
+    expect(estado.nocheActual?.perroExplorando).toBeUndefined();
+    expect(estado.perro.presente).toBe(true);
+
+    const despues: any = proyectarJugador(estado, capataz).acciones.find(
+      (a) => a.tipo === 'mandar_perro',
+    );
+    expect(despues.yaDecidio).toBe(true);
+    expect(despues.yaMandado).toBe(false);
+  });
+
+  test('Después de decir que no, no se puede cambiar de idea esa noche', () => {
+    let estado = estadoDecidirConCapataz();
+    let r = reducir(estado, { t: 'mandar_perro_a_explorar', jugador: capataz, manda: false });
+    expect(r.ok).toBe(true);
+    if (r.ok) estado = r.transicion.estado;
+
+    r = reducir(estado, { t: 'mandar_perro_a_explorar', jugador: capataz, manda: true });
+    expect(r.ok).toBe(false);
+  });
+
+  test('Con la semilla adecuada, mandarlo a explorar lo pierde: presente pasa a false', () => {
+    // El riesgo es de 25%: se prueban semillas hasta encontrar una donde
+    // salga, en vez de hardcodear un número mágico que se rompe si cambia el
+    // orden interno de consumos del Rng.
+    let encontrado = false;
+    for (let i = 0; i < 300 && !encontrado; i++) {
+      let estado = estadoDecidirConCapataz({ semilla: `test-perro-explora-${i}` });
+      let r = reducir(estado, { t: 'mandar_perro_a_explorar', jugador: capataz, manda: true });
+      expect(r.ok).toBe(true);
+      if (r.ok) estado = r.transicion.estado;
+
+      r = reducir(estado, { t: 'vencio_fase' });
+      expect(r.ok).toBe(true);
+      if (r.ok) estado = r.transicion.estado;
+      expect(estado.fase).toBe('resolver');
+
+      if (estado.perro.presente === false) {
+        encontrado = true;
+        expect(estado.cronica[estado.cronica.length - 1]?.hechos).toContain('perro_perdido');
+      }
+    }
+    expect(encontrado).toBe(true);
+  });
+
+  test('Si vuelve de explorar, la crónica lo registra y no lo pierde', () => {
+    let encontrado = false;
+    for (let i = 0; i < 300 && !encontrado; i++) {
+      let estado = estadoDecidirConCapataz({ semilla: `test-perro-vuelve-${i}` });
+      let r = reducir(estado, { t: 'mandar_perro_a_explorar', jugador: capataz, manda: true });
+      expect(r.ok).toBe(true);
+      if (r.ok) estado = r.transicion.estado;
+
+      r = reducir(estado, { t: 'vencio_fase' });
+      expect(r.ok).toBe(true);
+      if (r.ok) estado = r.transicion.estado;
+
+      if (estado.perro.presente === true) {
+        encontrado = true;
+        expect(estado.cronica[estado.cronica.length - 1]?.hechos).toContain('perro_exploro');
+      }
+    }
+    expect(encontrado).toBe(true);
+  });
+
+  test('Después de explorar y volver, la noche siguiente la alerta no miente y se revela el tramo más duro', () => {
+    // Estado justo antes de la transición fogon → acampar: el perro exploró
+    // anoche (perroExplorando en la noche que se está cerrando) y sobrevivió
+    // (perro.presente sigue true).
+    const estado = estadoDecidirConCapataz({
+      fase: 'fogon',
+      noche: 3,
+      nocheActual: {
+        numero: 3,
+        candidatos: tableroTest.tramos as any,
+        boletas: {},
+        perroExplorando: true,
+        venceEn: Date.now(),
+      },
+      perro: { presente: true, alerta: 'ninguna', dice_la_verdad: true },
+      cronica: [{ noche: 3, hechos: ['perro_exploro'], relato: '...', origen: 'respaldo' }],
+    });
+
+    const r = reducir(estado, { t: 'vencio_fase' });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+
+    expect(r.transicion.estado.fase).toBe('acampar');
+    expect(r.transicion.estado.noche).toBe(4);
+    // Forzado a true: se saltea el sorteo de PERRO_MIENTE por completo.
+    expect(r.transicion.estado.perro.dice_la_verdad).toBe(true);
+
+    const candidatosNuevos = r.transicion.estado.nocheActual!.candidatos;
+    const masDuro = candidatosNuevos.reduce(
+      (m, c) => (c.dureza > m.dureza ? c : m),
+      candidatosNuevos[0]!,
+    );
+    expect(r.transicion.estado.perro.tramoRevelado).toBe(masDuro.nombre);
+  });
+
+  test('Sin haber explorado, tramoRevelado no aparece y la mentira sigue siendo posible', () => {
+    const estado = estadoDecidirConCapataz({
+      fase: 'fogon',
+      noche: 3,
+      nocheActual: {
+        numero: 3,
+        candidatos: tableroTest.tramos as any,
+        boletas: {},
+        venceEn: Date.now(),
+      },
+      cronica: [{ noche: 3, hechos: ['tramo:x'], relato: '...', origen: 'respaldo' }],
+    });
+
+    const r = reducir(estado, { t: 'vencio_fase' });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.transicion.estado.perro.tramoRevelado).toBeUndefined();
+  });
+});
+
+/**
+ * A3: el pago del epílogo —objetivo propio, cumplido o no— también en el
+ * celular, no solo en la TV. Antes de esto el celular repetía el mismo "no
+ * te toca ninguna acción" genérico que usó toda la partida.
+ */
+describe('A3 — El celular revela lo tuyo', () => {
+  function estadoEpilogo(): EstadoPartida {
+    return {
+      id: partidaId('partida-epilogo'),
+      tablero: 'la-sierra' as any,
+      semilla: 'test-epilogo',
+      fase: 'epilogo',
+      noche: 5,
+      nochesTotales: 5,
+      avance: 24,
+      distanciaTotal: 24,
+      recurso: 10,
+      capacidad: 40,
+      viajeros: [
+        { id: jugadorId('j-1'), nombre: 'Nico', rol: 'baqueano', asiento: 0, vigor: 3, objetivo: 'llegar-entero' as any, conectado: true, cegado: false, aceptoElTrato: false },
+        { id: jugadorId('j-2'), nombre: 'Vale', rol: 'curandera', asiento: 1, vigor: 0, objetivo: 'que-nadie-quede' as any, conectado: true, cegado: false, aceptoElTrato: false },
+      ],
+      perro: { presente: true, alerta: 'ninguna', dice_la_verdad: true },
+      objetos: [],
+      cronica: [],
+      esfuerzoNocheAnterior: [],
+      desenlace: {
+        llegaron: true,
+        // Nico cumplió su objetivo ('llegar-entero': vigor > 0). Vale, con
+        // vigor 0, no cumplió el suyo ('que-nadie-quede').
+        objetivosCumplidos: [jugadorId('j-1')],
+        perroLlego: true,
+      },
+    };
+  }
+
+  test('miDesenlace trae el objetivo propio, cumplido o no', () => {
+    const estado = estadoEpilogo();
+
+    const vistaNico = proyectarJugador(estado, jugadorId('j-1'));
+    expect(vistaNico.miDesenlace).toEqual({
+      objetivo: 'Llegar sin haberte quebrado nunca.',
+      cumplido: true,
+      llegaron: true,
+    });
+
+    const vistaVale = proyectarJugador(estado, jugadorId('j-2'));
+    expect(vistaVale.miDesenlace).toEqual({
+      objetivo: 'Que ningún viajero termine quebrado.',
+      cumplido: false,
+      llegaron: true,
+    });
+  });
+
+  test('miDesenlace no filtra el objetivo de los demás', () => {
+    const estado = estadoEpilogo();
+
+    const vistaNico = proyectarJugador(estado, jugadorId('j-1'));
+    const jsonNico = JSON.stringify(vistaNico);
+    expect(jsonNico).not.toContain('que-nadie-quede');
+    expect(jsonNico).not.toContain('Que ningún viajero termine quebrado');
+
+    const vistaVale = proyectarJugador(estado, jugadorId('j-2'));
+    const jsonVale = JSON.stringify(vistaVale);
+    expect(jsonVale).not.toContain('llegar-entero');
+    expect(jsonVale).not.toContain('Llegar sin haberte quebrado nunca');
+  });
+
+  test('Fuera del epílogo, miDesenlace no viene', () => {
+    // `exactOptionalPropertyTypes` no deja asignar `desenlace: undefined`
+    // directo: hay que omitir la propiedad entera, no vaciarla.
+    const { desenlace, ...sinDesenlace } = estadoEpilogo();
+    const estado: EstadoPartida = { ...sinDesenlace, fase: 'fogon' };
+    expect(proyectarJugador(estado, jugadorId('j-1')).miDesenlace).toBeUndefined();
+  });
+});
+
+/**
  * Un cliente con el JS viejo en memoria durante un deploy reconecta el socket
  * y queda mudo sin ningún error visible. Esto es lo que lo convierte en una
  * recarga automática, y en un cartel si la recarga no alcanzó.
@@ -741,5 +1034,67 @@ describe('Versión de protocolo', () => {
 
   test('Versión distinta después de recargarse: se rinde y avisa, no entra en loop', () => {
     expect(decidirPorVersion(VERSION_PROTOCOLO + 1, true)).toBe('rendirse');
+  });
+});
+
+/**
+ * El trato (D9, C3): una vez por travesía, o ninguna. La noche se sortea al
+ * `empezar` con la config, no con probabilidades hardcodeadas por noche.
+ * Antes de C3 el motor tiraba 0.25/0.33/0.5 en cada transición y
+ * `TRATO.probabilidadDeNoOfrecer` no la leía nadie.
+ */
+describe('El trato sale de la config, una vez por travesía', () => {
+  function partidaEmpezada(semilla: string): EstadoPartida {
+    let estado = { id: partidaId('p-trato') } as EstadoPartida;
+    const paso = (c: Comando) => {
+      const r = reducir(estado, c);
+      if (!r.ok) throw new Error(`rechazado: ${c.t}`);
+      estado = r.transicion.estado;
+    };
+    paso({ t: 'crear', tablero: 'la-sierra' as any, semilla });
+    for (let i = 0; i < 5; i++) {
+      paso({ t: 'sumar_jugador', jugador: jugadorId(`t${i}`), nombre: `T${i}` });
+      paso({ t: 'marcar_listo', jugador: jugadorId(`t${i}`), listo: true });
+    }
+    paso({ t: 'empezar' });
+    return estado;
+  }
+
+  test('Si se ofrece, la noche cae dentro de la ventana de TRATO', () => {
+    for (let i = 0; i < 60; i++) {
+      const e = partidaEmpezada(`sem-trato-${i}`);
+      if (e.nocheTrato !== undefined) {
+        expect(e.nocheTrato).toBeGreaterThanOrEqual(TRATO.nocheMin);
+        expect(e.nocheTrato).toBeLessThanOrEqual(TRATO.nocheMax);
+      }
+    }
+  });
+
+  test('Que "a nadie" sea posible: hay travesías sin trato y travesías con', () => {
+    // Que "ninguno" sea posible es lo que hace que la sospecha salga gratis
+    // (D9). Si esto fallara en un solo sentido, el trato pasó a ser seguro o
+    // imposible, que son las dos formas de romper esa decisión.
+    let sin = 0;
+    let con = 0;
+    for (let i = 0; i < 120; i++) {
+      if (partidaEmpezada(`sem-reparto-${i}`).nocheTrato === undefined) sin++;
+      else con++;
+    }
+    expect(sin).toBeGreaterThan(0);
+    expect(con).toBeGreaterThan(0);
+  });
+
+  test('Misma semilla, misma noche de trato: sale del Rng, no de Math.random', () => {
+    const a = partidaEmpezada('sem-determinista');
+    const b = partidaEmpezada('sem-determinista');
+    expect(a.nocheTrato).toBe(b.nocheTrato);
+  });
+
+  test('nocheTrato no se filtra a ningún cliente', () => {
+    const e = partidaEmpezada('sem-fuga');
+    const tv = JSON.stringify(proyectarTV(e));
+    const jug = JSON.stringify(proyectarJugador(e, e.viajeros[0]!.id));
+    expect(tv).not.toContain('nocheTrato');
+    expect(jug).not.toContain('nocheTrato');
   });
 });

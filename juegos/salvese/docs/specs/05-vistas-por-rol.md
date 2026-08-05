@@ -39,6 +39,19 @@ proyectado como todo lo demás: el Capataz ve la lista entera —es su propia
 decisión— y en modo voluntario cada uno ve **solo si está él**, porque que otro se
 haya ofrecido es secreto hasta el fogón igual que la boleta (I7).
 
+El Capataz también es el único que puede recibir `mandar_perro` (A2, D10): desde
+la noche 3 y sólo si `perro.presente`. Sin Capataz en la mesa, esta acción no
+existe para nadie — a diferencia de `repartir_esfuerzo`, acá no hay modo
+voluntario. Trae `yaMandado` por el mismo motivo que `repartir_esfuerzo` trae
+`yaReparti`: que sobreviva a recargar el celular. A diferencia del esfuerzo, "no
+lo mando" no es una lista vacía que haya que registrar en el servidor — es
+simplemente no mandar el comando, así que el celular lo trata como una decisión
+local (ver `09-cliente-control.md`).
+
+Si el perro volvió de explorar la noche anterior, `VistaJugador.perroTramoRevelado`
+trae el tramo más duro de esa noche — el mismo dato que `VistaTV.perro.tramoRevelado`,
+porque es público, no un secreto de rol.
+
 El Despensero es el único que ve números y eso es a propósito: es el contrapeso
 exacto de la Curandera. Uno puede dictar una cifra en voz alta y que le crean o no;
 la otra no tiene cifra que dictar. Esa asimetría es lo que hace que las dos
@@ -81,6 +94,9 @@ cegado: enterarse de que el Baqueano no vio nada tiene que costar una pregunta.
 1. **Un secreto no sale nunca**, ni siquiera al dueño, si todavía no le toca. El
    objetivo personal se manda recién en el epílogo, aunque el jugador ya lo conozca
    desde el reparto: si está en el JSON, está a un inspector de distancia del resto.
+   En `epilogo`, `VistaJugador.miDesenlace` trae el objetivo del propio jugador
+   —texto y si lo cumplió— y **nada** del resto: el objetivo ajeno sigue siendo de
+   la TV, que ya lo manda entero en `VistaTV.desenlace.objetivos` (A3).
 2. **Los números salen convertidos.** `vigor` sale como `aspecto` con
    `aspectoDeVigor()`, que es el único lugar donde se hace esa conversión.
 3. **Las boletas ajenas no salen mientras se juega.** Sólo si un jugador bloqueó o

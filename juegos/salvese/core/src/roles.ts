@@ -83,11 +83,3 @@ export const REPARTO: Readonly<Record<number, readonly Rol[]>> = {
     'pasajero',
   ],
 };
-
-/**
- * Con 3 jugadores el Capataz se fusiona en el Memorioso, que tampoco está en la
- * mesa: quien tiene el rol combinado manda y recuerda. Ver diseno.md § Escalado.
- */
-export const FUSIONES: Readonly<Partial<Record<number, Readonly<Partial<Record<Rol, Rol>>>>>> = {
-  3: { capataz: 'memorioso' },
-};

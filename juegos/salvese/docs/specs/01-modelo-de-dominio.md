@@ -11,9 +11,9 @@ EstadoPartida
 ├─ avance / distanciaTotal        ← dónde va la caravana
 ├─ recurso / capacidad            ← raciones o agua, según el tablero
 ├─ viajeros[]                     ← rol, vigor, objetivo secreto, objeto
-├─ perro                          ← lo único público en vivo
+├─ perro                          ← lo único público en vivo; se lo puede perder (A2)
 ├─ objetos[]                      ← máximo 4 activos, todos se degradan
-├─ nocheActual?                   ← candidatos, boletas, esfuerzo asignado, vencimiento
+├─ nocheActual?                   ← candidatos, boletas, esfuerzo asignado, si el perro explora, vencimiento
 ├─ cronica[]                      ← una entrada por noche
 ├─ tratoOfrecidoA?
 ├─ esfuerzoNocheAnterior          ← quién fue anoche: no se repite (D19)
@@ -31,7 +31,7 @@ La información oculta es el juego. Estos campos **nunca** salen del servidor:
 
 | Campo | Quién puede llegar a verlo |
 |---|---|
-| `viajero.objetivo` | Nadie hasta el epílogo |
+| `viajero.objetivo` | Nadie hasta `epilogo`. Ahí, el propio dueño lo ve en `VistaJugador.miDesenlace` (A3); el de los demás sigue siendo de la TV (`VistaTV.desenlace`) |
 | `viajero.vigor` (el número) | Nadie. Afuera sale como `aspecto` cualitativo |
 | `viajero.aceptoElTrato` | El que aceptó, y recién en el epílogo |
 | `tramo.dureza`, `costoRecurso`, `hallazgo` | El Baqueano, de **un** tramo, como texto |
@@ -40,6 +40,9 @@ La información oculta es el juego. Estos campos **nunca** salen del servidor:
 | `nocheActual.esfuerzoRespondieron` | Cada jugador ve solo si él ya respondió (`yaReparti`). Existe aparte porque repartir "a nadie" y no haber repartido son los dos una lista vacía |
 | `ultimaRevelacion` | **Todos**, pero recién en `fogon` y `epilogo` (D18) — antes es tan secreto como la boleta de la que sale |
 | `perro.dice_la_verdad` | Nadie, nunca. Ni en el epílogo |
+| `nocheActual.perroExplorando` | **Todos** — es una decisión que se dice en voz alta (A2), no un secreto |
+| `nocheActual.perroDecidido` | El Capataz, como `yaDecidio`. Existe aparte porque "que se quede" y "todavía no contestó" dejan los dos `perroExplorando` sin tocar |
+| `perro.tramoRevelado` | **Todos**, la noche siguiente a que el perro vuelva de explorar (A2). Tan público como `alerta` |
 | `objeto.arquetipo` si no está identificado | Nadie |
 | `semilla` | Nadie durante la partida |
 
@@ -73,6 +76,9 @@ se rompe, es bug del motor, no jugada rara.
 | I10 | Todo azar salió del `Rng` de la semilla: `Math.random()` no aparece fuera de `rng.ts` |
 | I11 | `tratoOfrecidoA` se escribe a lo sumo una vez por travesía (`D9`) |
 | I12 | Ningún id de `esfuerzoNocheAnterior` puede aparecer en el `esfuerzoAsignado` de la noche siguiente (`D19`) |
+| I13 | `perro.presente` es monótono: una vez `false`, no vuelve a `true` (`D10`, `A2`) |
+| I14 | `nocheActual.perroExplorando` sólo puede ser `true` si `noche ≥ 3` y lo mandó el Capataz (`A2`) |
+| I15 | `perroExplorando = true` implica `perroDecidido = true`. Al revés no: "que se quede" decide sin mandar (`A2`) |
 
 ## Por qué el vigor no viaja como número
 

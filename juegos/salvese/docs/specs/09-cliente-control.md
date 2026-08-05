@@ -70,6 +70,46 @@ no algo para esconder.
 **En la noche 1 esta pantalla no existe**: no se reparte esfuerzo (D8, se decide
 una sola cosa) y el servidor rechaza el comando además de no ofrecer la acción.
 
+## Mandar al perro a explorar
+
+`mandar_perro` (A2, D10) es una pantalla propia, igual que `repartir_esfuerzo`:
+independiente de la boleta, se le ofrece solo al Capataz, desde la noche 3 y solo
+si el perro sigue presente. Sin Capataz en la mesa, esta pantalla no existe para
+nadie — a diferencia del esfuerzo, acá no hay modo voluntario.
+
+El copy tiene que dejar claro que se lo puede perder: es una decisión que se dice
+en voz alta con el grupo, no un trámite. Dos botones, "mandarlo" y "que se quede",
+y **los dos mandan el comando** — `manda: true` y `manda: false`. "Que se quede"
+es una respuesta, no un silencio.
+
+La pantalla se apaga con `yaDecidio`, no con `yaMandado`. Son distintos a
+propósito:
+
+| Campo | Qué dice |
+|---|---|
+| `yaDecidio` | El Capataz ya contestó, haya dicho que sí o que no |
+| `yaMandado` | El perro está afuera esta noche |
+
+Sin `yaDecidio`, "dijo que se quede" y "todavía no contestó" son indistinguibles
+del lado del servidor, y el celular tiene que acordarse solo: un `useState` que se
+pierde al recargar, con lo cual el Capataz que dijo que no y bloquea la pantalla
+del teléfono vuelve a encontrarse la pregunta a mitad de la noche. Es el mismo
+error que ya se había cometido con el reparto del esfuerzo, y la misma solución
+—registrar la respuesta en el servidor— porque el estado vive ahí (D4).
+
+Por eso `EstadoNoche` lleva `perroDecidido` además de `perroExplorando`, igual que
+lleva `esfuerzoRespondieron` además de `esfuerzoAsignado`. Cuando una respuesta
+válida deja el estado igual que no responder, hace falta un campo que registre que
+hubo respuesta.
+
+Una sola respuesta por noche: después de contestar no se puede cambiar de idea, en
+ningún sentido. Poder retirarlo después de mandarlo sería sacarlo del riesgo
+gratis.
+
+Si el perro volvió de explorar la noche anterior, la pantalla de elegir ruta
+(`PantallaRuta`) muestra el tramo más duro revelado (`VistaJugador.perroTramoRevelado`):
+es información pública y llega justo cuando hace falta, al elegir por dónde ir.
+
 ### Que ya repartió lo dice el servidor, no el celular
 
 La acción trae `yaReparti` y `yaAsignado`, y el cliente pinta a partir de eso:
@@ -95,6 +135,27 @@ hicieron caso.
 
 Después de bloquear, la pantalla dice qué bloqueó y nada más. Sin cuenta regresiva:
 **el reloj está en la TV, que es donde tiene que mirar la mesa.**
+
+## El epílogo revela lo tuyo
+
+Hasta A3, en `epilogo` el celular repetía el mismo "no te toca ninguna acción"
+genérico que usó toda la partida: el objetivo personal —cumplido o no— se veía
+solo en la TV. Veinticinco minutos sosteniendo el teléfono, y la persona que más
+le prestó atención a su rol era la que menos se enteraba de cómo terminó.
+
+`VistaJugador.miDesenlace` trae el objetivo propio (texto de `OBJETIVOS_TEXTO`),
+si se cumplió, y si la caravana llegó. `JuegoControl.tsx` lo intercepta antes que
+cualquier otra pantalla —ni wizard, ni "hablá con el grupo"— con `PantallaEpilogo`
+(`Acciones.tsx`).
+
+Los cuatro cuadrantes se leen distinto a propósito (D21): llegar con la caravana
+pero fallar lo tuyo no es lo mismo que al revés. `PantallaEpilogo` separa los
+cuatro con título y remate propios en vez de una sola frase con dos booleans
+pegados.
+
+`miDesenlace` **no** trae el objetivo de nadie más: eso sigue siendo de la TV
+(`VistaTV.desenlace.objetivos`), que ya lo muestra completo — la revelación
+conjunta es el momento de la mesa, no del celular de cada uno.
 
 ## Reconexión
 

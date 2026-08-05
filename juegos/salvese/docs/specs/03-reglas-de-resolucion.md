@@ -126,7 +126,9 @@ semilla, en este orden, para que la partida sea reproducible:
    mazo del tablero. Si ya hay 4 objetos activos, no sale nada.
 10. **Degradación**: `usosRestantes--` en todos los objetos activos; los que llegan a
     0 se caen.
-11. **El perro** (ver abajo).
+11. **El perro**: si lo mandaron a explorar, se sortea si vuelve (ver abajo). El
+    efecto de volver —alerta sin mentira y tramo revelado— se aplica recién en la
+    transición `fogon → acampar` de la noche siguiente, no acá.
 12. **El trato**, si corresponde esta noche.
 13. **Revelación de boletas**: se computa `RevelacionBoletas` y se guarda en
     `ultimaRevelacion` (ver arriba).
@@ -138,15 +140,56 @@ No obedece: avisa (`D10`). Cada noche, después de resolver:
 
 1. El motor mira el tramo **más duro** de los candidatos de la noche siguiente.
 2. Calcula la alerta que correspondería: `ninguna`, `inquieto`, `grune`, `no_avanza`.
-3. `rng.suerte(0.2)` → si sale, **miente**: muestra otra alerta al azar y
-   `dice_la_verdad = false`.
+3. `rng.suerte(PERRO_MIENTE)` (0.2) → si sale, **miente**: muestra otra alerta al
+   azar y `dice_la_verdad = false`.
 
 Es el único dato público del juego. Que mienta 1 de cada 5 veces es lo que lo
 convierte de oráculo en discusión: nadie puede tratarlo como verdad y nadie puede
 ignorarlo.
 
-Se lo puede perder si lo mandan a explorar (acción disponible desde la noche 3).
-`presente = false` es permanente y la crónica final lo nombra igual.
+### Se lo puede perder
+
+**Manda el Capataz.** D10 dice "nadie lo controla", y eso sigue valiendo para
+todos menos para esta decisión: es la única que duele sin ser contra un jugador
+(`diseno.md`), así que cae en quien reparte el dolor, no en un voto ni en un modo
+voluntario. **Sin Capataz en la mesa** (2 y 3 jugadores, ver `REPARTO`) esta acción
+no existe: esa partida no se puede mandar a explorar.
+
+Comando `mandar_perro_a_explorar`, válido en fase `decidir`. Todas estas
+condiciones tienen que cumplirse, o se rechaza con `jugada_invalida`:
+
+- Lo manda el Capataz, nadie más.
+- `estado.noche >= 3`.
+- `perro.presente` (no se puede explorar con un perro que ya se perdió).
+- No haber **contestado** ya esta misma noche (`nocheActual.perroDecidido`).
+
+El comando lleva `manda: boolean`: **"que se quede" también se manda**. Deja
+`perroDecidido = true` sin tocar `perroExplorando`, y con eso el celular sabe que
+ya contestó aunque el estado del perro no haya cambiado. Sin ese registro, decir
+que no y recargar el teléfono hace volver la pregunta a mitad de la noche
+([09 · Cliente control](09-cliente-control.md) § Mandar al perro a explorar).
+
+Una vez contestado no se cambia de idea en ningún sentido: retirarlo después de
+haberlo mandado sería sacarlo del riesgo gratis.
+
+Al resolver la noche (paso 10 del orden de abajo), si se lo mandó a explorar,
+`rng.suerte(PERRO_EXPLORA_RIESGO)` (25%, `config.ts`) decide el resultado:
+
+- **Se pierde**: `perro.presente = false`, permanente, y la crónica registra el
+  hecho `perro_perdido`. La crónica final lo nombra igual.
+- **Vuelve**: la crónica registra `perro_exploro`. Ese resultado se guarda para
+  la noche siguiente (ver abajo): los candidatos de esa noche todavía no existen
+  cuando resuelve la noche en la que se mandó, así que el efecto se aplica recién
+  en la transición `fogon → acampar`.
+
+**Qué da volver.** La noche siguiente el motor **saltea por completo** el sorteo
+de `PERRO_MIENTE`: esa noche `dice_la_verdad` queda forzado a `true`. Además se
+guarda en `perro.tramoRevelado` el nombre del tramo más duro entre los candidatos
+de esa noche — público, igual que la alerta. Cambia mentira por riesgo: el perro
+sigue siendo el único dato público del juego, pero por una noche es información
+segura en vez de sospechosa. `tramoRevelado` solo dura esa noche: la transición
+siguiente reconstruye `perro` entero y lo omite salvo que se haya vuelto a
+explorar con éxito.
 
 ## El trato
 

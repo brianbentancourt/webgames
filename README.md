@@ -48,7 +48,10 @@ Los celulares entran por la IP de la máquina en la misma red: alcanza para las
 primeras mesas y no hace falta desplegar nada. Sin `ANTHROPIC_API_KEY` los juegos
 funcionan igual, con sus textos de respaldo.
 
-`pnpm -r typecheck` · `pnpm test`
+`pnpm -r typecheck` · `pnpm test` · `pnpm -r build` — o las tres seguidas con
+`pnpm verificar`. Ninguna de las dos primeras mira CSS ni assets: el `build`
+es el que hubiera agarrado el bundle de la TV roto que las otras dos dejaron
+pasar en verde. Correrlo antes de todo deploy.
 
 ## Cómo se publica
 

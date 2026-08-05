@@ -61,9 +61,9 @@ traidor — hay gente con prioridades distintas. La revelación reinterpreta la 
 | Jugadores | Cómo |
 |---|---|
 | 2 | La IA ocupa dos sillas y las actúa con opinión propia. Discute, insiste, se equivoca. |
-| 3 | Se fusiona Capataz en Memorioso. |
+| 3 | Baqueano, Curandera y Despensero, uno por persona. Sin Capataz: el esfuerzo se ofrece voluntario, cada uno declara si se ofrece (D19). Sin Memorioso: no hay registro de travesías previas que consultar. |
 | 4–5 | Un rol por persona. **Punto óptimo: 5.** |
-| 6–8 | Los roles se juegan **de a dos**: la pareja acuerda entre sí antes de hablarle al grupo. |
+| 6–8 | Los roles se van duplicando **de a uno** según entra gente —primero el Baqueano, después la Curandera, después el Despensero—, así que no todos son pareja al mismo tiempo. Donde hay pareja, acuerda entre sí antes de hablarle al grupo. El Capataz nunca se duplica: es el que manda y reparte el trabajo pesado todas las noches desde D19, y dos personas mandando no es un rol, es un empate. |
 | 9–10 | Parejas + **pasajeros**: sin habilidad, con voto y objetivo propio. Son el pueblo. |
 
 El límite no es técnico, es de aire para hablar. Nadie espera turno en ninguna configuración.

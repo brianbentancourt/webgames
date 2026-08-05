@@ -5,11 +5,24 @@ interface BaseProps {
   onSiguiente: (valor: any) => void;
 }
 
-export function PantallaRuta({ accion, onSiguiente }: BaseProps & { accion: Extract<Accion, { tipo: 'elegir_ruta' }> }) {
+export function PantallaRuta({
+  accion,
+  onSiguiente,
+  tramoMasDuroRevelado,
+}: BaseProps & {
+  accion: Extract<Accion, { tipo: 'elegir_ruta' }>;
+  /** Si el perro volvió de explorar anoche (A2): el tramo más duro de esta noche, sin mentira. */
+  tramoMasDuroRevelado?: string | undefined;
+}) {
   return (
     <div className="opciones">
       <p className="titulo">EL CAMINO</p>
       <p className="linea" style={{ marginBottom: 12 }}>¿Por dónde avanzamos hoy?</p>
+      {tramoMasDuroRevelado && (
+        <p className="opcion-detalle" style={{ marginBottom: 4 }}>
+          El perro volvió y no miente: el tramo más duro de hoy es {tramoMasDuroRevelado}.
+        </p>
+      )}
       {accion.opciones.map((o) => (
         <button key={o.id} className="boton-opcion" onClick={() => onSiguiente(o.id)}>
           <span className="opcion-nombre">{o.nombre}</span>
@@ -87,6 +100,77 @@ export function PantallaRepartirEsfuerzo({
       <button className="boton-primario" style={{ marginTop: 20 }} onClick={() => onConfirmar(seleccion)}>
         {accion.yaReparti ? 'CAMBIAR' : 'CONFIRMAR'}
       </button>
+    </div>
+  );
+}
+
+/**
+ * Mandar al perro a explorar (A2, D10). Pantalla propia, independiente de la
+ * boleta: el Capataz puede decidir en cualquier momento de la ventana. A
+ * diferencia de `repartir_esfuerzo`, acá "no lo mando" es una opción real y
+ * no una lista vacía — por eso tiene su propio botón en vez de forzar una
+ * confirmación.
+ */
+export function PantallaMandarPerro({
+  onMandar,
+  onOmitir,
+}: {
+  onMandar: () => void;
+  onOmitir: () => void;
+}) {
+  return (
+    <div className="opciones" style={{ marginTop: 'auto', marginBottom: 'auto' }}>
+      <p className="titulo" style={{ color: 'var(--brasa)' }}>EL PERRO</p>
+      <p className="linea">¿Lo mandás a explorar esta noche? Se puede perder.</p>
+      <p className="opcion-detalle">Es para decidirlo en voz alta con el grupo.</p>
+      <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+        <button className="boton-primario" onClick={onMandar}>Mandarlo</button>
+        <button className="secundario" onClick={onOmitir}>Que se quede</button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * El pago del epílogo (A3): el objetivo propio, cumplido o no, y cómo se lee
+ * cruzado con si la caravana llegó. Los cuatro cuadrantes se leen distinto a
+ * propósito (D21): llegar con la caravana pero fallar lo tuyo no es lo mismo
+ * que al revés.
+ */
+export function PantallaEpilogo({
+  desenlace,
+}: {
+  desenlace: { objetivo: string; cumplido: boolean; llegaron: boolean };
+}) {
+  const { objetivo, cumplido, llegaron } = desenlace;
+
+  let titulo: string;
+  let remate: string;
+  if (llegaron && cumplido) {
+    titulo = 'LO LOGRASTE';
+    remate = 'La caravana llegó, y vos conseguiste lo tuyo.';
+  } else if (llegaron && !cumplido) {
+    titulo = 'LLEGASTE, PERO...';
+    remate = 'La caravana llegó entera. Lo tuyo quedó en el camino.';
+  } else if (!llegaron && cumplido) {
+    titulo = 'GANASTE VOS, NO EL GRUPO';
+    remate = 'La caravana no llegó. Vos conseguiste lo tuyo igual.';
+  } else {
+    titulo = 'NO ALCANZÓ';
+    remate = 'Ni la caravana llegó, ni conseguiste lo tuyo.';
+  }
+
+  return (
+    <div className="opciones" style={{ marginTop: 'auto', marginBottom: 'auto', textAlign: 'center' }}>
+      <p className="titulo" style={{ color: 'var(--brasa)' }}>{titulo}</p>
+      <p className="linea" style={{ marginTop: 8 }}>{remate}</p>
+      <div className="resumen-boleta" style={{ marginTop: 24, textAlign: 'left' }}>
+        <p className="opcion-detalle">Tu objetivo era:</p>
+        <p style={{ fontWeight: 600, fontSize: 20 }}>{objetivo}</p>
+        <p className="al-pie" style={{ marginTop: 8, color: cumplido ? undefined : 'var(--brasa)' }}>
+          {cumplido ? 'Lo cumpliste.' : 'No lo cumpliste.'}
+        </p>
+      </div>
     </div>
   );
 }

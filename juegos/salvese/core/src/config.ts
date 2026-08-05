@@ -75,5 +75,24 @@ export const AVANCE = {
 /** El perro miente ~1 de cada 5 veces (D10). Deja de ser oráculo, pasa a ser discusión. */
 export const PERRO_MIENTE = 0.2;
 
+/**
+ * Riesgo de perderlo si el Capataz lo manda a explorar, disponible desde la
+ * noche 3 (D10, A2). Si vuelve, la noche siguiente no miente y se sabe el
+ * tramo más duro de los candidatos: cambia mentira por riesgo.
+ */
+export const PERRO_EXPLORA_RIESGO = 0.25;
+
 /** El trato se ofrece una vez por travesía, o a nadie (D9). Ventana de noches candidatas. */
 export const TRATO = { nocheMin: 2, nocheMax: 4, probabilidadDeNoOfrecer: 0.25 } as const;
+
+/**
+ * Cuánta capacidad del recurso crítico suman o restan ciertos objetos
+ * (`maquina.ts`). Son deltas sobre `capacidad` del tablero, no valores fijos:
+ * un tablero con otra capacidad base no tiene que quedar mal calibrado.
+ */
+export const OBJETOS_CAPACIDAD = {
+  /** La bordalesa (El Salitral) suma a la capacidad del tablero. */
+  bordalesaBono: 8,
+  /** El yunque de mano ocupa espacio que era de las raciones. */
+  yunqueDeManoCosto: 5,
+} as const;

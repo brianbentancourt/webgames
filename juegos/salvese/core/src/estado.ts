@@ -42,6 +42,14 @@ export interface EstadoPerro {
   alerta: 'ninguna' | 'inquieto' | 'grune' | 'no_avanza';
   /** Secreto: si esta noche la alerta corresponde a lo que hay o no (D10). */
   dice_la_verdad: boolean;
+  /**
+   * Si volvió de explorar la noche anterior (A2), el nombre del tramo más
+   * duro entre los candidatos de ESTA noche. Público, igual que `alerta`: es
+   * lo que se gana a cambio de arriesgarlo. Solo dura una noche — la próxima
+   * transición reconstruye `perro` entero y lo omite salvo que haya vuelto a
+   * explorar con éxito otra vez.
+   */
+  tramoRevelado?: string;
 }
 
 export interface EstadoObjeto {
@@ -93,6 +101,25 @@ export interface EstadoNoche {
    * recargar y contradice D4 (el estado vive en el servidor).
    */
   esfuerzoRespondieron?: JugadorId[];
+  /**
+   * El Capataz lo mandó a explorar esta noche (A2, D10). Independiente del
+   * esfuerzo y de la boleta: es una decisión propia, con el comando
+   * `mandar_perro_a_explorar`. Público desde que se manda — se dice en voz
+   * alta — así que no hace falta un `perroExploroRespondio` al estilo de
+   * `esfuerzoRespondieron`: acá "no mandado" y "mandado" no se confunden,
+   * porque no hay equivalente a la lista vacía.
+   */
+  perroExplorando?: boolean;
+  /**
+   * El Capataz ya respondió por el perro esta noche, haya dicho que sí o que no.
+   *
+   * No se puede derivar de `perroExplorando`: "que se quede" y "todavía no
+   * contestó" son los dos `perroExplorando !== true`. Es el mismo motivo por el
+   * que existe `esfuerzoRespondieron` — sin esto, el celular tiene que
+   * acordarse en estado local de que ya dijo que no, se pierde al recargar y la
+   * pantalla vuelve a aparecer a mitad de la noche (D4).
+   */
+  perroDecidido?: boolean;
   /** Marca de tiempo del servidor en la que vence la ventana de decisión. */
   venceEn: number;
 }
@@ -174,6 +201,15 @@ export interface EstadoPartida {
   cronica: EntradaCronica[];
   /** A quién se le ofreció el trato esta travesía, si a alguien. */
   tratoOfrecidoA?: JugadorId;
+  /**
+   * En qué noche se ofrece el trato esta travesía, si se ofrece (D9). Se
+   * decide una sola vez, al `empezar`, tirando `TRATO.probabilidadDeNoOfrecer`
+   * y —si no sale eso— sorteando la noche dentro de `TRATO.nocheMin`–
+   * `nocheMax` (ver `maquina.ts`). `undefined` significa que esta travesía no
+   * lo ofrece a nadie; no confundir con "todavía no se decidió", que no
+   * existe: se decide de una vez al empezar.
+   */
+  nocheTrato?: number;
   /**
    * Quiénes fueron al trabajo pesado la noche anterior. No se puede mandar a
    * la misma persona dos noches seguidas (D19): esto es lo que hace esa regla

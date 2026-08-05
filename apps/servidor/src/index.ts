@@ -338,6 +338,13 @@ wss.on('connection', (socket) => {
           jugador: asiento.id,
           a: msg.a as any,
         };
+      } else if (msg.t === 'mandar_perro_a_explorar') {
+        if (asiento === undefined) return;
+        comandoPartida = {
+          t: 'mandar_perro_a_explorar',
+          jugador: asiento.id,
+          manda: msg.manda,
+        };
       } else if (msg.t === 'bloquear') {
         if (asiento === undefined) return;
         comandoPartida = {

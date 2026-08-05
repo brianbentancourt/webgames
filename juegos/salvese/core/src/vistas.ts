@@ -26,7 +26,14 @@ export interface VistaTV {
   tablero: { id: string; nombre: string; paleta: Paleta; tramo: string; fondo: string };
   /** Sin números: barras cortas, siluetas, quién ya bloqueó. */
   viajeros: ViajeroPublico[];
-  perro: { presente: boolean; alerta: string };
+  perro: {
+    presente: boolean;
+    alerta: string;
+    /** El Capataz lo mandó a explorar esta noche y todavía no se supo el resultado (A2). */
+    explorando?: boolean;
+    /** Si volvió de explorar anoche: el tramo más duro de esta noche, dato público (A2, D10). */
+    tramoRevelado?: string;
+  };
   /** Nombre y silueta nada más. El efecto no es público hasta que se usa. */
   objetos: { id: ObjetoId; nombre: string; portador?: JugadorId }[];
   candidatos: { id: TramoId; nombre: string; pista: string }[];
@@ -95,6 +102,18 @@ export interface VistaJugador {
   boleta?: { ruta: TramoId; raciones: NivelRaciones };
   /** Solo para el destinatario del trato, y solo esa noche (D9). */
   trato?: { texto: string; costo: string };
+  /**
+   * Si el perro volvió de explorar anoche (A2): el tramo más duro de esta
+   * noche. Dato público, igual que en la TV — no es un secreto de rol.
+   */
+  perroTramoRevelado?: string;
+  /**
+   * El pago del jugador, recién en `epilogo` (A3). Antes de esto, el celular
+   * repetía "no te toca ninguna acción" el epílogo entero: la persona que más
+   * le prestó atención a su rol era la que menos se enteraba de cómo terminó.
+   * Solo trae SU objetivo — el de los demás es de la TV (`VistaTV.desenlace`).
+   */
+  miDesenlace?: { objetivo: string; cumplido: boolean; llegaron: boolean };
 }
 
 export type Revelacion =
@@ -139,6 +158,25 @@ export type Accion =
       yaAsignado: JugadorId[];
     }
   | { tipo: 'bloquear' }
+  /**
+   * Mandar al perro a explorar (A2, D10). Solo se le ofrece al Capataz, desde
+   * la noche 3 y solo si `perro.presente`. Independiente de la boleta y del
+   * esfuerzo, con su propia pantalla — es una decisión que se dice en voz
+   * alta y que se puede perder.
+   *
+   * `yaMandado` es lo que hace que sobreviva a recargar el celular (D4): no
+   * se puede mandar dos veces la misma noche, y sin este dato el cliente
+   * tendría que recordarlo en estado local.
+   */
+  /**
+   * El Capataz decide qué hace con el perro esta noche (D10, A2).
+   *
+   * `yaDecidio` es lo que apaga la pantalla en el celular, no `yaMandado`:
+   * "que se quede" también es una respuesta y tiene que sobrevivir a recargar
+   * el teléfono. Mismo criterio que `repartir_esfuerzo.yaReparti` — el estado
+   * vive en el servidor (D4).
+   */
+  | { tipo: 'mandar_perro'; yaMandado: boolean; yaDecidio: boolean }
   | { tipo: 'responder_trato' }
   | { tipo: 'entregar_objeto'; objeto: ObjetoId; candidatos: { id: JugadorId; nombre: string }[] }
   | { tipo: 'votar_tablero'; opciones: { id: string; nombre: string }[] };
@@ -312,6 +350,10 @@ export function proyectarTV(
     perro: {
       presente: estado.perro.presente,
       alerta: estado.perro.alerta,
+      // Dato nada más (A2): que se lo mandó a explorar es público —se dice en
+      // voz alta— y dura hasta que resuelve la noche. No hay pintura acá.
+      ...(estado.nocheActual?.perroExplorando ? { explorando: true } : {}),
+      ...(estado.perro.tramoRevelado ? { tramoRevelado: estado.perro.tramoRevelado } : {}),
     },
     objetos,
     candidatos,
@@ -522,6 +564,17 @@ export function proyectarJugador(
         });
       }
     }
+
+    // Mandar al perro a explorar (A2, D10): solo el Capataz, desde la noche
+    // 3 y solo si sigue presente. Independiente de la boleta y del esfuerzo,
+    // como `repartir_esfuerzo` arriba.
+    if (yo.rol === 'capataz' && estado.noche >= 3 && estado.perro.presente) {
+      acciones.push({
+        tipo: 'mandar_perro',
+        yaMandado: estado.nocheActual.perroExplorando === true,
+        yaDecidio: estado.nocheActual.perroDecidido === true,
+      });
+    }
   } else if (enAcampar) {
     if (yo.objeto) {
       acciones.push({
@@ -562,6 +615,18 @@ export function proyectarJugador(
     };
   }
 
+  // El pago del jugador, recién en `epilogo` (A3). Solo el suyo: el de los
+  // demás sale de `VistaTV.desenlace`, no de acá — filtrarlo es la regla, no
+  // un detalle (05-vistas-por-rol.md § Reglas de proyección).
+  let miDesenlace: VistaJugador['miDesenlace'];
+  if (estado.fase === 'epilogo' && estado.desenlace) {
+    miDesenlace = {
+      objetivo: OBJETIVOS_TEXTO[estado.tablero]?.[yo.objetivo] ?? 'Un objetivo personal.',
+      cumplido: estado.desenlace.objetivosCumplidos.includes(yo.id),
+      llegaron: estado.desenlace.llegaron,
+    };
+  }
+
   return {
     yo: {
       id: yo.id,
@@ -576,6 +641,8 @@ export function proyectarJugador(
     acciones,
     ...(boletaExistente ? { boleta: boletaExistente } : {}),
     ...(trato ? { trato } : {}),
+    ...(estado.perro.tramoRevelado ? { perroTramoRevelado: estado.perro.tramoRevelado } : {}),
+    ...(miDesenlace ? { miDesenlace } : {}),
   };
 }
 

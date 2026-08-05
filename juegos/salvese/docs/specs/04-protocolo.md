@@ -26,6 +26,7 @@ página no puede sacar a nadie de la partida.
 | `listo` | Celular | En `lobby` |
 | `elegir` | Celular | En `decidir`. Parcial y repetible: actualiza la boleta (ruta, raciones) en curso |
 | `asignar_esfuerzo` | El Capataz, o cualquiera (solo a sí mismo) si no hay Capataz | En `decidir`. Independiente de la boleta (D19): no depende de `elegir`/`bloquear` |
+| `mandar_perro_a_explorar` | Sólo el Capataz | En `decidir`, desde la noche 3, y sólo si `perro.presente` (A2). Lleva `manda`: "que se quede" también se manda, porque es una respuesta y no un silencio. Una sola por noche. Sin Capataz en la mesa, no existe |
 | `bloquear` | Celular | En `decidir`. Cierra la boleta; desde acá no se cambia |
 | `responder_trato` | Sólo el destinatario | En la noche de la oferta |
 | `entregar_objeto` | Celular | En `acampar` o `fogon` |
@@ -99,7 +100,6 @@ celu ← jugador { vista completa de la fase en curso }
 | `sesion_invalida` | El token no corresponde a ningún asiento de esta sala |
 | `fuera_de_fase` | El comando es válido pero no ahora |
 | `jugada_invalida` | El mensaje parseó pero pide algo imposible |
-| `version_incompatible` | El cliente habla otra versión del protocolo |
 | `mensaje_ilegible` | No es JSON, o no matchea ningún schema |
 
 Ningún error cierra la conexión. El cliente muestra el mensaje y sigue.
@@ -132,11 +132,6 @@ ningún error. La TV es la más expuesta porque se queda prendida horas.
 **Cuándo se sube**: cuando un cliente viejo deja de funcionar contra un servidor
 nuevo — un mensaje que se va, un campo obligatorio nuevo, una `Accion` que cambia
 de forma. No hace falta para agregar campos opcionales.
-
-> **Deuda conocida**: el código de error `version_incompatible` está declarado en
-> `CodigoError` y no se emite en ningún lado. Quedó de un diseño anterior en el
-> que el chequeo era del servidor, que no puede funcionar por lo de arriba. O se
-> borra, o el cliente empieza a mandar su versión al conectarse.
 
 ## Conexiones que se caen solas
 

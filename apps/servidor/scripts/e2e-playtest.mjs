@@ -6,8 +6,8 @@
  * A diferencia de `runner.ts` — que juega el motor puro sin red — esto ejercita
  * exactamente lo que el roadmap (M2) marcaba como pendiente y nunca se había
  * probado de verdad: `fogon`, `entregar_objeto`, `responder_trato`, votar
- * tablero, y un celular que se cae y vuelve a mitad de partida con su token de
- * sesión.
+ * tablero, `mandar_perro_a_explorar` (A2), y un celular que se cae y vuelve a
+ * mitad de partida con su token de sesión.
  *
  * Uso: PUERTO=8787 node scripts/e2e-playtest.mjs   (desde apps/servidor)
  * El proceso servidor tiene que estar corriendo aparte.
@@ -37,6 +37,14 @@ const resultado = {
   repartioCapataz: false,
   /** La TV mostró la revelación de boletas en el fogón (D18). */
   vioRevelacion: false,
+  /** El Capataz mandó al perro a explorar (A2), desde la noche 3. */
+  mandoPerro: false,
+  /** El Capataz respondió "que se quede": es una decisión registrada, no un silencio. */
+  dejoAlPerro: false,
+  /** La TV mostró `perro.explorando` mientras se esperaba el resultado (A2). */
+  vioPerroExplorando: false,
+  /** Resultado de la exploración: se pierde o vuelve. Random por semilla — se registra, no se fuerza. */
+  perroResultado: /** @type {'perdido' | 'volvio' | null} */ (null),
 };
 
 function conectar() {
@@ -156,6 +164,23 @@ class Jugador {
       hizoAlgo = true;
     }
 
+    // Mandar al perro a explorar (A2): disponible desde la noche 3, solo
+    // para el Capataz. El bot lo manda la primera vez que puede, para
+    // ejercitar el comando de punta a punta contra un servidor real.
+    // `yaDecidio`, no `yaMandado`: "que se quede" también es una respuesta
+    // registrada en el servidor, y con `yaMandado` el bot volvería a
+    // preguntar cada tick después de decir que no.
+    const accionPerro = v.acciones.find((a) => a.tipo === 'mandar_perro');
+    if (accionPerro && !accionPerro.yaDecidio) {
+      // Lo manda la primera vez que puede y después dice que no, para
+      // ejercitar las dos respuestas contra un servidor real.
+      const manda = !resultado.mandoPerro;
+      this.mandar({ t: 'mandar_perro_a_explorar', manda });
+      if (manda) resultado.mandoPerro = true;
+      else resultado.dejoAlPerro = true;
+      hizoAlgo = true;
+    }
+
     // Noche 1 con tutorial: solo bloquear, el motor completa el resto.
     if (v.acciones.length === 1 && v.acciones[0].tipo === 'bloquear') {
       this.mandar({ t: 'bloquear' });
@@ -250,6 +275,22 @@ async function main() {
       resultado.vioRevelacion = true;
     }
 
+    // El perro explorando (A2) es dato público: la TV lo tiene que ver apenas
+    // el Capataz lo manda, sin esperar a que resuelva la noche.
+    if (vistaTV?.perro?.explorando && !resultado.vioPerroExplorando) {
+      resultado.vioPerroExplorando = true;
+      console.log(`  el perro está explorando (noche ${vistaTV.noche})`);
+    }
+    if (resultado.mandoPerro && resultado.perroResultado === null) {
+      if (vistaTV?.perro?.presente === false) {
+        resultado.perroResultado = 'perdido';
+        console.log(`  el perro se perdió explorando (noche ${vistaTV.noche})`);
+      } else if (vistaTV?.perro?.tramoRevelado) {
+        resultado.perroResultado = 'volvio';
+        console.log(`  el perro volvió: no miente, el tramo más duro es "${vistaTV.perro.tramoRevelado}"`);
+      }
+    }
+
     // A mitad de camino, se cae un celular y vuelve con su token.
     if (!reconectoIntentado && ultimaNoche === 2 && vistaTV?.fase === 'acampar') {
       reconectoIntentado = true;
@@ -274,6 +315,7 @@ async function main() {
   console.log('=== EPÍLOGO ===');
   console.log('llegaron:', vistaTV.desenlace?.llegaron);
   console.log('perro llegó:', vistaTV.desenlace?.perroLlego);
+  console.log('mandó a explorar (A2):', resultado.mandoPerro, '· resultado:', resultado.perroResultado ?? 'sin resolver todavía');
   for (const o of vistaTV.desenlace?.objetivos ?? []) {
     console.log(`  ${o.nombre}: ${o.texto} — ${o.cumplido ? 'CUMPLIDO' : 'no cumplido'}`);
   }
@@ -295,7 +337,10 @@ async function main() {
   const faltantes = Object.entries(resultado).filter(([, v]) => !v).map(([k]) => k);
   if (faltantes.length > 0) {
     console.log(`\nAVISO: no se ejercitaron estos caminos en esta corrida: ${faltantes.join(', ')}`);
-    console.log('(el trato y el hallazgo de objetos dependen del azar de la semilla; no es necesariamente un bug)');
+    console.log(
+      '(el trato, el hallazgo de objetos y si el perro se pierde al explorar dependen del azar ' +
+        'de la semilla; no es necesariamente un bug)',
+    );
   }
 
   tv.close();

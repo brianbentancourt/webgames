@@ -3,7 +3,7 @@ import { jugadorId, objetoId } from './ids.js';
 import type { EstadoPartida, NivelRaciones, Viajero, EstadoNoche, Boleta, EntradaCronica, Fase, Vigor, Tramo, RevelacionBoletas } from './estado.js';
 import type { Escena, PedidoRelato, ResultadoRelato } from './llm.js';
 import type { Gatillo } from './vistas.js';
-import { VIGOR_MAX, VIGOR_INICIAL, RACIONES, AVANCE, TIEMPOS, ventanaDecidirMs, hayRepartoDeEsfuerzo, PERRO_MIENTE } from './config.js';
+import { VIGOR_MAX, VIGOR_INICIAL, RACIONES, AVANCE, TIEMPOS, ventanaDecidirMs, hayRepartoDeEsfuerzo, PERRO_MIENTE, PERRO_EXPLORA_RIESGO, TRATO, OBJETOS_CAPACIDAD } from './config.js';
 import { crearRng } from './rng.js';
 import { REPARTO, type Rol } from './roles.js';
 
@@ -26,6 +26,13 @@ export type Comando =
    * de `elegir`/`bloquear` a propósito: no depende de la boleta.
    */
   | { t: 'asignar_esfuerzo'; jugador: JugadorId; a: JugadorId[] }
+  /**
+   * El Capataz manda al perro a explorar (D10, A2). Nadie más lo controla —
+   * solo esta decisión, que es la que duele, cae en quien reparte el dolor.
+   * Disponible desde la noche 3, solo si `perro.presente`, y una sola vez por
+   * noche. Independiente del esfuerzo y de la boleta.
+   */
+  | { t: 'mandar_perro_a_explorar'; jugador: JugadorId; manda: boolean }
   | { t: 'responder_trato'; jugador: JugadorId; acepta: boolean }
   | { t: 'entregar_objeto'; de: JugadorId; a: JugadorId }
   /** Vence el reloj de la fase actual. Lo dispara el servidor, no un jugador. */
@@ -242,10 +249,20 @@ export function reducir(estado: EstadoPartida, comando: Comando): Resultado {
         }
       }
 
+      // El trato (D9, C3): se decide una sola vez para toda la travesía, acá
+      // — no una probabilidad creciente noche a noche. Una tirada decide si
+      // esta travesía no lo ofrece a nadie; si lo ofrece, la noche sale
+      // sorteada dentro de la ventana de `TRATO`. A quién se le ofrece esa
+      // noche se resuelve más tarde, en la transición fogón → acampar, porque
+      // depende de cómo viene la partida en ese momento.
+      const noSeOfrece = rng.suerte(TRATO.probabilidadDeNoOfrecer);
+      const nocheTrato = noSeOfrece ? undefined : rng.entero(TRATO.nocheMin, TRATO.nocheMax);
+
       const estadoSiguiente: EstadoPartida = {
         ...estado,
         fase: 'reparto',
         viajeros: nuevosViajeros,
+        ...(nocheTrato !== undefined ? { nocheTrato } : {}),
       };
 
       return {
@@ -507,6 +524,44 @@ export function reducir(estado: EstadoPartida, comando: Comando): Resultado {
         transicion: {
           estado: nuevoEstado,
           efectos: [{ t: 'publicar', a: { jugador: comando.jugador } }],
+        },
+      };
+    }
+
+    if (comando.t === 'mandar_perro_a_explorar') {
+      const nocheActual = estado.nocheActual;
+      if (!nocheActual) return { ok: false, motivo: 'fuera_de_fase' };
+
+      // Manda el Capataz. Sin Capataz en la mesa (2 y 3 jugadores) esta
+      // acción no existe: D10 dice "nadie lo controla", y acá se toma la
+      // decisión que más duele, así que cae en quien reparte el dolor, no en
+      // un modo voluntario inventado.
+      const capataz = estado.viajeros.find((v) => v.rol === 'capataz');
+      if (!capataz || comando.jugador !== capataz.id) {
+        return { ok: false, motivo: 'jugada_invalida' };
+      }
+      if (estado.noche < 3) return { ok: false, motivo: 'jugada_invalida' };
+      if (!estado.perro.presente) return { ok: false, motivo: 'jugada_invalida' };
+      // Una sola respuesta por noche, diga que sí o que no: cambiar de idea
+      // después de haberlo mandado sería poder retirarlo del riesgo.
+      if (nocheActual.perroDecidido) return { ok: false, motivo: 'jugada_invalida' };
+
+      // "Que se quede" se registra igual que "mandalo". Sin este registro el
+      // servidor no distingue el "no" del silencio, y el celular tiene que
+      // acordarse solo (D4, ver `EstadoNoche.perroDecidido`).
+      const nuevaNocheActual: EstadoNoche = {
+        ...nocheActual,
+        perroDecidido: true,
+        ...(comando.manda ? { perroExplorando: true } : {}),
+      };
+      return {
+        ok: true,
+        transicion: {
+          estado: { ...estado, nocheActual: nuevaNocheActual },
+          // Que el perro salga a explorar es dato público en vivo (D10), así
+          // que va a toda la mesa. Que se quede no cambia nada visible, pero
+          // se publica igual para que el Capataz reciba su vista actualizada.
+          efectos: [{ t: 'publicar', a: 'todos' }],
         },
       };
     }
@@ -822,50 +877,57 @@ export function reducir(estado: EstadoPartida, comando: Comando): Resultado {
       const alertaCorrecta = alertas[durezaMax]!;
       let alerta = alertaCorrecta;
       let diceVerdad = true;
-      if (rng.suerte(PERRO_MIENTE)) {
+
+      // Si el perro exploró anoche y volvió (A2, D10), la alerta de esta
+      // noche no miente: se saltea el sorteo de `PERRO_MIENTE` entero. Se
+      // detecta acá y no en `resolverNoche()` porque los candidatos de esta
+      // noche —de donde sale el tramo más duro que se revela— todavía no
+      // existían cuando resolvió la noche anterior.
+      const perroExploroYSobrevivio =
+        estado.nocheActual?.perroExplorando === true && estado.perro.presente;
+
+      if (!perroExploroYSobrevivio && rng.suerte(PERRO_MIENTE)) {
         const alternativas = alertas.filter((a) => a !== alertaCorrecta);
         alerta = rng.elegir(alternativas);
         diceVerdad = false;
       }
 
-      // Trato: noches 2 a 4
+      const tramoMasDuro = candidatos.reduce(
+        (masDuro, c) => (c.dureza > masDuro.dureza ? c : masDuro),
+        candidatos[0]!,
+      );
+
+      // Trato (D9, C3): si esta travesía lo ofrece, la noche ya salió
+      // sorteada al `empezar` (`estado.nocheTrato`). Acá solo se resuelve A
+      // QUIÉN, si esta es esa noche — depende de cómo viene la partida ahora.
       let tratoOfrecidoA = estado.tratoOfrecidoA;
-      // Probabilidad de trato si no se ha ofrecido y estamos en la ventana
-      if (
-        tratoOfrecidoA === undefined &&
-        siguienteNoche >= 2 &&
-        siguienteNoche <= 4
-      ) {
-        // Probabilidad de ofrecer el trato (equivalente a 75% en toda Sálvese quien pueda!)
-        const chance = siguienteNoche === 2 ? 0.25 : siguienteNoche === 3 ? 0.33 : 0.5;
-        if (rng.suerte(chance)) {
-          // Evaluar viajero con mayor retraso en objetivo
-          let maxScore = -1;
-          let viajerosCandidatos: Viajero[] = [];
-          for (const v of estado.viajeros) {
-            let score = 3 - v.vigor; // por default
-            if (v.objetivo === 'mano-propia') {
-              // contar de crónica
-              let countEffort = 0;
-              for (const entry of estado.cronica) {
-                const fact = entry.hechos.find((h) => h.startsWith('esfuerzo:'));
-                if (fact && fact.substring(9).includes(v.nombre)) {
-                  countEffort++;
-                }
+      if (tratoOfrecidoA === undefined && siguienteNoche === estado.nocheTrato) {
+        // Evaluar viajero con mayor retraso en objetivo
+        let maxScore = -1;
+        let viajerosCandidatos: Viajero[] = [];
+        for (const v of estado.viajeros) {
+          let score = 3 - v.vigor; // por default
+          if (v.objetivo === 'mano-propia') {
+            // contar de crónica
+            let countEffort = 0;
+            for (const entry of estado.cronica) {
+              const fact = entry.hechos.find((h) => h.startsWith('esfuerzo:'));
+              if (fact && fact.substring(9).includes(v.nombre)) {
+                countEffort++;
               }
-              score = 5 - countEffort;
             }
-            if (score > maxScore) {
-              maxScore = score;
-              viajerosCandidatos = [v];
-            } else if (score === maxScore) {
-              viajerosCandidatos.push(v);
-            }
+            score = 5 - countEffort;
           }
-          if (viajerosCandidatos.length > 0) {
-            const elegido = rng.elegir(viajerosCandidatos);
-            tratoOfrecidoA = elegido.id;
+          if (score > maxScore) {
+            maxScore = score;
+            viajerosCandidatos = [v];
+          } else if (score === maxScore) {
+            viajerosCandidatos.push(v);
           }
+        }
+        if (viajerosCandidatos.length > 0) {
+          const elegido = rng.elegir(viajerosCandidatos);
+          tratoOfrecidoA = elegido.id;
         }
       }
 
@@ -910,6 +972,7 @@ export function reducir(estado: EstadoPartida, comando: Comando): Resultado {
           presente: estado.perro.presente,
           alerta,
           dice_la_verdad: diceVerdad,
+          ...(perroExploroYSobrevivio ? { tramoRevelado: tramoMasDuro.nombre } : {}),
         },
         ...(tratoOfrecidoA !== undefined ? { tratoOfrecidoA } : {}),
       };
@@ -1157,15 +1220,17 @@ function resolverNoche(
   let consumo = viajerosActivos * RACIONES.consumoPorViajero[decisionRaciones] + tramoElegido.costoRecurso;
   consumo = Math.max(0, consumo);
 
-  // Objeto 'bordalesa' en El Salitral suma 8 a capacidad
+  // Objeto 'bordalesa' en El Salitral: suma a la capacidad del tablero, no la
+  // fija (antes era `capacidad = 38`, asumiendo a mano la capacidad de La
+  // Sierra — con otro tablero quedaba mal).
   let capacidad = estado.capacidad;
   if (estado.objetos.some((o) => o.arquetipo === 'bordalesa')) {
-    capacidad = 38; // 30 + 8
+    capacidad += OBJETOS_CAPACIDAD.bordalesaBono;
   }
 
-  // Objeto 'yunque-de-mano' aumenta la carga y ocupa 5 de capacidad de raciones
+  // Objeto 'yunque-de-mano' aumenta la carga y ocupa capacidad de raciones
   if (estado.objetos.some((o) => o.arquetipo === 'yunque-de-mano')) {
-    capacidad = Math.max(0, capacidad - 5);
+    capacidad = Math.max(0, capacidad - OBJETOS_CAPACIDAD.yunqueDeManoCosto);
   }
 
   const recursoEfectivo = Math.min(estado.recurso, consumo);
@@ -1280,9 +1345,14 @@ function resolverNoche(
     return true;
   });
 
-  // 10. Perro
+  // 10. El perro explora, si el Capataz lo mandó esta noche (A2, D10). Riesgo
+  // fijo `PERRO_EXPLORA_RIESGO`: puede no volver. Si vuelve, la transición
+  // fogon → acampar de más abajo es la que aprovecha el resultado (saltea la
+  // mentira de la noche siguiente y revela el tramo más duro) porque los
+  // candidatos de esa noche todavía no existen acá.
   let perroPresente = estado.perro.presente;
-  if (decisionEsfuerzo.includes('perro' as any)) {
+  const perroMandadoAExplorar = estado.nocheActual!.perroExplorando === true;
+  if (perroMandadoAExplorar && perroPresente && rng.suerte(PERRO_EXPLORA_RIESGO)) {
     perroPresente = false;
   }
 
@@ -1304,6 +1374,7 @@ function resolverNoche(
   hechos.push(`avance:${avanceNoche}`);
   hechos.push(`recurso:${recursoEfectivo}`);
   if (pagoIncompleto) hechos.push('hambre');
+  if (perroMandadoAExplorar) hechos.push(perroPresente ? 'perro_exploro' : 'perro_perdido');
   if (decisionEsfuerzo.length > 0) {
     const nombresEsfuerzo = decisionEsfuerzo
       .map((id) => viajerosModificados.find((x) => x.id === id)?.nombre ?? '')
@@ -1374,15 +1445,18 @@ function resolverNoche(
     fondos: tablero.fondos,
   };
 
-  // Gatillos de esta noche: la resolución siempre anima; objeto y quiebre son
-  // condicionales a lo que efectivamente pasó (los mismos hechos que ya se
-  // registraron arriba, no un chequeo nuevo).
+  // Gatillos de esta noche: la resolución siempre anima; objeto, quiebre y
+  // perro_perdido son condicionales a lo que efectivamente pasó (los mismos
+  // hechos que ya se registraron arriba, no un chequeo nuevo).
   const gatillosNoche: Gatillo[] = [{ tipo: 'resolucion', duracionMs: TIEMPOS.resolverMs }];
   if (hechos.some((h) => h.startsWith('quiebre:'))) {
     gatillosNoche.push({ tipo: 'alerta', que: 'quiebre', duracionMs: TIEMPOS.alertaMs });
   }
   if (hechos.some((h) => h.startsWith('objeto:'))) {
     gatillosNoche.push({ tipo: 'alerta', que: 'objeto', duracionMs: TIEMPOS.alertaMs });
+  }
+  if (hechos.includes('perro_perdido')) {
+    gatillosNoche.push({ tipo: 'alerta', que: 'perro', duracionMs: TIEMPOS.alertaMs });
   }
 
   return {

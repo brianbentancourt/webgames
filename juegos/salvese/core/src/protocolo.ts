@@ -23,8 +23,9 @@ import type { VistaJugador, VistaTV } from './vistas.js';
  *
  * 2 — D18/D19: se fue `elegir_esfuerzo` y la boleta perdió `esfuerzo`; llegó
  *     `asignar_esfuerzo` y la acción `repartir_esfuerzo`.
+ * 3 — A2: llegó `mandar_perro_a_explorar` y la acción `mandar_perro`.
  */
-export const VERSION_PROTOCOLO = 2;
+export const VERSION_PROTOCOLO = 3;
 
 /* ------------------------------------------------------------------ */
 /* cliente → servidor                                                  */
@@ -58,6 +59,16 @@ export const MensajeEntranteSchema = z.discriminatedUnion('t', [
    * de `elegir`/`bloquear`: no depende de la boleta ni al revés.
    */
   z.object({ t: z.literal('asignar_esfuerzo'), a: z.array(z.string()).max(3) }),
+  /**
+   * El Capataz decide qué hace con el perro esta noche (D10, A2). El jugador
+   * sale del asiento de la conexión, igual que `bloquear`.
+   *
+   * `manda: false` —"que se quede"— también se manda: es una respuesta, no un
+   * silencio. Si no viajara, el servidor no podría distinguir "dijo que no" de
+   * "todavía no contestó" y el celular tendría que recordarlo en estado local,
+   * que se pierde al recargar (D4).
+   */
+  z.object({ t: z.literal('mandar_perro_a_explorar'), manda: z.boolean() }),
   z.object({ t: z.literal('responder_trato'), acepta: z.boolean() }),
   z.object({ t: z.literal('entregar_objeto'), objeto: z.string(), a: z.string() }),
   z.object({ t: z.literal('quitar_jugador'), jugador: z.string() }),
@@ -95,7 +106,6 @@ export type CodigoError =
   | 'sesion_invalida'
   | 'fuera_de_fase'
   | 'jugada_invalida'
-  | 'version_incompatible'
   | 'mensaje_ilegible';
 
 /** Marca de "ya me recargué por esto", para no entrar en un loop de recargas. */
