@@ -180,3 +180,90 @@ que resulte común va a ser evidente recién con el segundo juego funcionando.
 **Un solo proceso y un solo hostname**, con los juegos colgando de rutas
 (`/salvese`, `/salvese/control`). Un juego más no es infraestructura más. Si alguna
 vez uno necesita su propio proceso —otro runtime, otra escala— ahí se le da el suyo.
+
+---
+
+### D18 — La boleta es secreta durante la noche y pública después
+
+Se revela en el fogón, con nombre: quién votó qué en cada dimensión y cómo se
+resolvió.
+
+Sin esto, D1 ("la conversación es el juego") no se sostiene: se puede decir "voto
+por el paso" y votar el río, y nadie se entera **nunca**. Tres minutos de discusión
+donde mentir es gratis, indetectable e inútil a la vez. Revelar después convierte
+cada frase dicha en un compromiso verificable, y le da a la anécdota (pilar 4) un
+culpable con nombre en vez de una mayoría anónima.
+
+De paso le da contenido propio al fogón, que era la peor falla del playtest de
+M3.5, sin escribir una línea de contenido nuevo.
+
+**Descartado revelarlas en vivo durante la ventana**: mata la tensión y convierte
+la discusión en un tablero de votación. El valor está en el desfasaje — se habla a
+ciegas, se paga después.
+
+---
+
+### D19 — El esfuerzo no se vota: lo reparte el Capataz
+
+Cada noche el Capataz nombra solo a quién manda al trabajo pesado. No puede mandar
+a la misma persona dos noches seguidas.
+
+Es el pilar 3 —"toda decisión duele contra una persona"— que no estaba
+implementado en ninguna parte: se votaba contra opciones abstractas. Y le da al
+Capataz un trabajo **todas** las noches; hasta ahora existía solo en los empates y
+en la noche 5, o sea casi nunca. Toda la mesa lo lobbea durante la ventana, que es
+exactamente la conversación que el juego dice querer.
+
+Crea además una dependencia entre dos personas concretas: el Capataz no ve el
+vigor y la Curandera sí, así que la Curandera pasa a tener un interlocutor con
+nombre en vez de "el grupo".
+
+**Sin Capataz en la mesa** (2 y 3 jugadores, ver `REPARTO`) el esfuerzo es
+voluntario: cada uno declara si se ofrece. Con esa cantidad de gente no hace falta
+una autoridad.
+
+**Descartado dejarlo como voto y solo arreglar el conteo** —que estaba roto: no
+contaba votos, ordenaba por votos y se llevaba los tres primeros, tuvieran votos o
+no. Arreglar eso corrige el bug y no corrige el juego.
+
+---
+
+### D20 — Se puede mentir con la habilidad, dos veces por travesía
+
+El celular muestra lo que ves y pregunta qué reportás. Las opciones falsas son las
+descripciones **reales de los otros tramos**, así que son indistinguibles y no hay
+patrón que aprender.
+
+La información oculta no era falsificable: se decía lo que se veía y nada
+registraba si era cierto. Con esto la habilidad deja de ser un cable —entra dato,
+sale dato— y pasa a ser una decisión. Recién acá la regla de que el vigor viaje
+como texto y no como número tiene recompensa mecánica en vez de ser una
+restricción sin nada del otro lado.
+
+**El límite de dos es lo que sostiene el sistema.** Si mentir es gratis todos
+mienten siempre y la información vale cero. Con dos, cada mentira es cara, la
+información es mayormente cierta —vale la pena escuchar— y nunca segura —vale la
+pena discutir.
+
+**Matiza D2**: sigue sin haber traidor. Se shadea porque el objetivo propio lo
+necesita, no porque se gane si el grupo pierde. Es el "gente con prioridades
+distintas" que D2 prometió y que ninguna mecánica entregaba.
+
+---
+
+### D21 — El objetivo personal puede ganarse con la caravana perdida
+
+Dos marcadores independientes en el epílogo: si llegaron, y si conseguiste lo tuyo.
+Los cuatro cuadrantes son resultados válidos. Y los objetivos exigen **conducta
+visible** durante toda la travesía, no una condición pasiva que se mide al final.
+
+**Da vuelta D9** en su parte de goma: el trato ahora tiene un costo grupal real que
+se cobra en la última noche.
+
+Un objetivo que no puede hacerte perder ni obligarte a nada durante la partida es
+un billete de lotería que se revela al final, no una tensión. Y la divergencia sin
+fricción no es divergencia: el checklist de tableros ya pedía que "al menos dos
+objetivos se estorben" y no se cumplía porque ninguno obligaba a nada.
+
+Lo que **no** cambia de D9: que el trato pueda no ofrecerse a nadie. Que "ninguno"
+sea posible es lo que hace que la sospecha salga gratis.
