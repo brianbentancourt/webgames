@@ -1,7 +1,7 @@
 /**
  * Salas en memoria. Una sala es un código de 4 letras, una TV y hasta 10 celulares.
  *
- * Deliberadamente sin base de datos: una partida dura 25 minutos y no sobrevive a
+ * Deliberadamente sin base de datos: una partida dura 15 minutos y no sobrevive a
  * un reinicio del proceso. Si algún día hay que persistir, se persiste el log de
  * comandos y la semilla, no el estado (el motor es determinista).
  */
@@ -35,10 +35,12 @@ export interface Sala {
    * Reloj de la fase en curso, una vez que existe `partida` (viene de un
    * efecto `agendar` del motor). Campo separado a propósito: si compartiera
    * el mismo timer que el lobby, un jugador reconectando a mitad de una noche
-   * cancelaría el único reloj que hace avanzar la partida y Sálvese quien pueda!
+   * cancelaría el único reloj que hace avanzar la partida y la noche
    * quedaría congelada para siempre sin que nadie lo note.
    */
   faseTimerId?: NodeJS.Timeout;
+  /** Cuándo vence `faseTimerId`, en reloj del servidor. */
+  venceEn?: number;
 }
 
 const salas = new Map<SalaId, Sala>();

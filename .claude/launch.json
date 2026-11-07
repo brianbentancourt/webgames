@@ -2,15 +2,36 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "servidor-prueba",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "@juegos/servidor",
+        "dev"
+      ],
+      "port": 8788,
+      "env": {
+        "PUERTO": "8788"
+      }
+    },
+    {
       "name": "travesia-tv",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@salvese/tv", "dev"],
+      "runtimeArgs": [
+        "--filter",
+        "@salvese/tv",
+        "dev"
+      ],
       "port": 5173
     },
     {
       "name": "travesia-control",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@salvese/control", "dev"],
+      "runtimeArgs": [
+        "--filter",
+        "@salvese/control",
+        "dev"
+      ],
       "port": 5174
     }
   ]

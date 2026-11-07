@@ -2,14 +2,22 @@
  * Se abre en la tele y en el celular. Todo en relativo al alto de pantalla para
  * que lo primero se lea a tres metros, con un piso en px para que lo segundo se
  * lea en la mano.
+ *
+ * Misma estética que los juegos: papel recortado sobre la noche, sombras duras,
+ * bordes de tijera. Nada de vidrio esmerilado ni degradés de app.
  */
 
 :root {
   --cielo: #0b1020;
-  --tinta: #e8e2d6;
+  --tinta: #ece5d8;
+  --tinta-suave: rgba(236, 229, 216, 0.7);
   --brasa: #ff7a3c;
-  --borde: rgba(232, 226, 214, 0.18);
+  --papel: #efe3c8;
+  --papel-tinta: #2a1f14;
+  --papel-acento: #8a5512;
   --overscan: 5vh;
+  --serif: ui-serif, Georgia, 'Times New Roman', serif;
+  --sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
 
 * {
@@ -27,153 +35,202 @@ body,
 body {
   background: var(--cielo);
   color: var(--tinta);
-  font-family: ui-serif, Georgia, 'Times New Roman', serif;
+  font-family: var(--serif);
   -webkit-font-smoothing: antialiased;
   position: relative;
 }
 
 body::before {
-  content: "";
-  position: absolute;
+  content: '';
+  position: fixed;
   inset: 0;
-  background-image: url("/fondos/portal-fondo.jpg");
+  background-image: linear-gradient(180deg, rgba(11, 16, 32, 0.35), rgba(11, 16, 32, 0.85)), url('/fondos/portal-fondo.jpg');
   background-size: cover;
   background-position: center bottom;
-  opacity: 0.6;
   pointer-events: none;
   z-index: -1;
-  filter: blur(2px) contrast(1.1);
 }
 
 .pantalla {
   min-height: 100dvh;
-  padding: max(var(--overscan), 24px) max(calc(var(--overscan) * 1.2), 20px);
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: max(var(--overscan), 24px) max(calc(var(--overscan) * 1.4), 20px);
   display: flex;
   flex-direction: column;
-  gap: max(4vh, 28px);
+  gap: max(4vh, 24px);
   justify-content: center;
 }
 
 .marca {
-  font-size: max(7vh, 40px);
+  font-size: max(9vh, 48px);
   line-height: 1;
-  letter-spacing: 0.02em;
-  font-weight: 400;
+  font-weight: normal;
+  color: var(--brasa);
+  text-shadow: 0.3vh 0.5vh 0 rgba(0, 0, 0, 0.5);
 }
 
-.al-pie {
-  font-size: max(2.2vh, 14px);
-  opacity: 0.55;
+.bajada {
+  margin-top: 1vh;
+  font-size: max(2.6vh, 16px);
+  color: var(--tinta-suave);
+}
+
+.aviso {
+  font-size: max(2.6vh, 16px);
+  color: var(--tinta-suave);
 }
 
 .lista {
   list-style: none;
   display: grid;
-  gap: max(2vh, 14px);
-  grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr));
+  gap: max(3vh, 18px);
+  grid-template-columns: repeat(auto-fit, minmax(min(560px, 100%), 1fr));
 }
 
+/* La tarjeta es un papel pegado sobre la noche. */
 .tarjeta {
   display: flex;
-  flex-direction: column;
-  height: 100%;
-  padding: max(3vh, 20px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
-  color: inherit;
-  text-decoration: none;
-  background: rgba(11, 16, 32, 0.45);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
-  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s ease, border-color 0.3s ease;
-}
-
-.tarjeta:hover {
-  transform: translateY(-6px);
-  box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.6);
-  border-color: rgba(255, 122, 60, 0.4);
-}
-
-.tarjeta-contenido {
-  display: flex;
-  flex-direction: column;
-  gap: 0.6em;
-  flex: 1;
+  gap: max(2.4vh, 16px);
+  padding: max(3vh, 18px);
+  background: var(--papel);
+  color: var(--papel-tinta);
+  clip-path: polygon(0.6% 1%, 99.5% 0%, 100% 98.5%, 0% 100%);
+  filter: drop-shadow(0.6vh 0.9vh 0 rgba(0, 0, 0, 0.5));
+  transform: rotate(-0.6deg);
 }
 
 .tarjeta[data-estado='en_obra'] {
-  opacity: 0.4;
-  pointer-events: none;
+  opacity: 0.5;
 }
 
-/* Cero hover en la tele: el foco es lo que se mueve con el control remoto. */
-.tarjeta:focus-within {
-  outline: 2px solid var(--brasa);
-  outline-offset: 4px;
+.tarjeta-imagen {
+  width: max(18vh, 96px);
+  height: max(18vh, 96px);
+  flex: none;
+  object-fit: cover;
+  clip-path: polygon(3% 2%, 98% 0%, 100% 97%, 0% 100%);
 }
 
-.nombre {
-  font-size: max(3.4vh, 24px);
-  color: var(--brasa);
-  text-shadow: 0 0 12px rgba(255, 122, 60, 0.35);
+.tarjeta-cuerpo {
+  display: flex;
+  flex-direction: column;
+  gap: max(1.2vh, 8px);
+  min-width: 0;
+  flex: 1;
+}
+
+.tarjeta-nombre {
+  font-size: max(4.4vh, 26px);
+  line-height: 1.05;
+  font-weight: normal;
+  color: var(--papel-acento);
+}
+
+.tarjeta-resumen {
+  font-size: max(2.6vh, 17px);
+  line-height: 1.4;
+}
+
+.tarjeta-datos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6em 1.4em;
+  font-family: var(--sans);
+  font-size: max(2.2vh, 15px);
   font-weight: 600;
-  letter-spacing: 0.01em;
-}
-
-.resumen {
-  font-size: max(2.4vh, 16px);
-  line-height: 1.5;
-  color: rgba(232, 226, 214, 0.9);
-}
-
-.brasa {
-  color: var(--brasa);
+  opacity: 0.75;
 }
 
 .acciones {
   display: flex;
-  gap: 12px;
-  margin-top: max(3vh, 20px);
+  gap: max(1.4vh, 10px);
+  margin-top: max(1vh, 6px);
   flex-wrap: wrap;
 }
 
-.boton-accion {
-  flex: 1;
-  text-align: center;
-  padding: 12px 16px;
-  background: linear-gradient(135deg, var(--brasa) 0%, #e65100 100%);
-  color: #0b1020;
+.boton {
+  flex: 1 1 200px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5em;
+  min-height: max(7vh, 52px);
+  padding: 0 18px;
+  font-family: var(--sans);
   font-weight: 700;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-size: max(2.4vh, 17px);
   text-decoration: none;
-  font-size: 16px;
-  border-radius: 8px;
-  box-shadow: 0 4px 15px rgba(255, 122, 60, 0.3);
-  transition: all 0.2s ease;
-  border: 1px solid transparent;
+  clip-path: polygon(1% 4%, 99% 0%, 100% 96%, 0% 100%);
+  transition: transform 0.12s steps(2, end);
 }
 
-.boton-accion.secundario {
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--tinta);
-  border: 1px solid rgba(232, 226, 214, 0.15);
-  box-shadow: none;
+.boton:active {
+  transform: translate(2px, 3px);
 }
 
-.boton-accion:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(255, 122, 60, 0.5);
-  filter: brightness(1.1);
+.boton:focus-visible {
+  outline: 4px solid var(--papel-tinta);
+  outline-offset: 4px;
 }
 
-.boton-accion.secundario:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(232, 226, 214, 0.3);
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+.boton-tele {
+  background: var(--brasa);
+  color: #1a0c04;
 }
 
-.boton-accion:active {
-  transform: translateY(1px);
-  box-shadow: 0 2px 8px rgba(255, 122, 60, 0.3);
+.boton-celu {
+  background: var(--papel-tinta);
+  color: var(--papel);
+}
+
+.boton-icono {
+  font-size: 1.2em;
+}
+
+/* En un celular, lo que se quiere casi siempre es sumarse: ese botón va primero
+   y se pinta de brasa. En la tele, abrir el tablero. */
+@media (hover: none) and (max-width: 700px) {
+  .boton-celu {
+    order: -1;
+    background: var(--brasa);
+    color: #1a0c04;
+  }
+
+  .boton-tele {
+    background: var(--papel-tinta);
+    color: var(--papel);
+  }
+
+}
+
+/* Pantalla angosta: sin overscan de tele, la imagen es decoración que sobra. */
+@media (max-width: 700px) {
+  .pantalla {
+    padding-inline: 16px;
+    justify-content: flex-start;
+  }
+
+  .tarjeta-imagen {
+    display: none;
+  }
+
+  .boton {
+    flex-basis: 100%;
+  }
+}
+
+.pie {
+  font-size: max(2.2vh, 15px);
+  color: var(--tinta-suave);
+}
+
+.pie span {
+  color: var(--brasa);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .boton {
+    transition: none;
+  }
 }

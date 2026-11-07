@@ -5,7 +5,6 @@ import { TableroSchema, type Tablero } from './schema.js';
 export * from './schema.js';
 export { laSierra, elSalitral };
 
-/** El primero viene abierto, el resto se desbloquea al terminar una travesía. */
 export const TABLEROS: readonly Tablero[] = [laSierra, elSalitral];
 
 export function obtenerTablero(id: string): Tablero | undefined {

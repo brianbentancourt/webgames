@@ -1,5 +1,5 @@
 /**
- * Protocolo de la conexión. Ver docs/specs/04-protocolo.md.
+ * Protocolo de la conexión entre el servidor, la TV y los celulares.
  *
  * Asimetría a propósito: lo que llega del cliente se valida con zod porque no se
  * confía en nada de lo que entra por la red; lo que sale del servidor son tipos de
@@ -24,14 +24,15 @@ import type { VistaJugador, VistaTV } from './vistas.js';
  * 2 — D18/D19: se fue `elegir_esfuerzo` y la boleta perdió `esfuerzo`; llegó
  *     `asignar_esfuerzo` y la acción `repartir_esfuerzo`.
  * 3 — A2: llegó `mandar_perro_a_explorar` y la acción `mandar_perro`.
+ * 4 — D24: el juego pasó a ser "sigo o me vuelvo". `elegir` lleva `opcion`;
+ *     se fueron la boleta, el esfuerzo, el perro explorador, el trato y los
+ *     objetos; llegaron `revancha` y `en_espera`.
  */
-export const VERSION_PROTOCOLO = 3;
+export const VERSION_PROTOCOLO = 4;
 
 /* ------------------------------------------------------------------ */
 /* cliente → servidor                                                  */
 /* ------------------------------------------------------------------ */
-
-const nivelRaciones = z.enum(['ajustado', 'normal', 'abundante']);
 
 export const MensajeEntranteSchema = z.discriminatedUnion('t', [
   /** Un celular entra a la sala. Sin `sesion` es alguien nuevo; con `sesion`, vuelve. */
@@ -45,32 +46,10 @@ export const MensajeEntranteSchema = z.discriminatedUnion('t', [
   z.object({ t: z.literal('abrir_sala'), tablero: z.string().optional() }),
   z.object({ t: z.literal('votar_tablero'), tablero: z.string() }),
   z.object({ t: z.literal('listo'), listo: z.boolean() }),
-  /** Actualiza la boleta en curso. Se puede llamar muchas veces antes de bloquear. */
-  z.object({
-    t: z.literal('elegir'),
-    ruta: z.string().optional(),
-    raciones: nivelRaciones.optional(),
-  }),
-  /** Cierra la boleta. A partir de acá no se cambia: se bloquea en secreto. */
-  z.object({ t: z.literal('bloquear') }),
-  /**
-   * A quiénes manda al trabajo pesado esta noche (D19). Del Capataz si lo hay
-   * en la mesa; si no, cada uno solo puede mandarse a sí mismo. Independiente
-   * de `elegir`/`bloquear`: no depende de la boleta ni al revés.
-   */
-  z.object({ t: z.literal('asignar_esfuerzo'), a: z.array(z.string()).max(3) }),
-  /**
-   * El Capataz decide qué hace con el perro esta noche (D10, A2). El jugador
-   * sale del asiento de la conexión, igual que `bloquear`.
-   *
-   * `manda: false` —"que se quede"— también se manda: es una respuesta, no un
-   * silencio. Si no viajara, el servidor no podría distinguir "dijo que no" de
-   * "todavía no contestó" y el celular tendría que recordarlo en estado local,
-   * que se pierde al recargar (D4).
-   */
-  z.object({ t: z.literal('mandar_perro_a_explorar'), manda: z.boolean() }),
-  z.object({ t: z.literal('responder_trato'), acepta: z.boolean() }),
-  z.object({ t: z.literal('entregar_objeto'), objeto: z.string(), a: z.string() }),
+  /** Sigo o me vuelvo. Un toque y queda: no se cambia. */
+  z.object({ t: z.literal('elegir'), opcion: z.enum(['sigo', 'vuelvo']) }),
+  /** Desde el final: otra partida con la misma mesa. */
+  z.object({ t: z.literal('revancha') }),
   z.object({ t: z.literal('quitar_jugador'), jugador: z.string() }),
   z.object({ t: z.literal('ping') }),
 ]);
@@ -97,6 +76,8 @@ export type MensajeSaliente =
   /** Estado completo. Se manda entero en cada transición: no hay parches (D4). */
   | { t: 'tv'; vista: VistaTV }
   | { t: 'jugador'; vista: VistaJugador }
+  /** Entraste con la partida andando: jugás desde la revancha. */
+  | { t: 'en_espera' }
   | { t: 'error'; codigo: CodigoError; mensaje: string }
   | { t: 'pong' };
 

@@ -69,6 +69,19 @@ body::before {
   line-height: 1;
 }
 
+.pitch {
+  font-size: 2.8vh;
+  line-height: 1.4;
+  max-width: 60vw;
+  margin-top: 3vh;
+  opacity: 0.85;
+}
+
+.pitch strong {
+  color: var(--brasa);
+  font-weight: normal;
+}
+
 .al-pie {
   opacity: 0.55;
   font-size: 2.4vh;
@@ -597,306 +610,6 @@ body::before {
   text-shadow: 0 0 1vh rgba(0, 0, 0, 0.8);
 }
 
-.panel-candidatos {
-  position: absolute;
-  bottom: var(--overscan);
-  left: calc(var(--overscan) * 1.2);
-  right: calc(var(--overscan) * 1.2);
-  display: flex;
-  gap: 2vw;
-  justify-content: center;
-}
-
-.candidato-tarjeta {
-  background: rgba(0, 0, 0, 0.45);
-  padding: 1.5vh 2vw;
-  max-width: 30ch;
-  clip-path: polygon(3% 2%, 98% 4%, 95% 96%, 1% 98%);
-  transform: rotate(1deg);
-}
-
-/* Lo que trajo el perro de explorar (A2): va sobre el tramo, no en un cartel
-   aparte. Es lo único que marca una tarjeta, así que no compite con nada. */
-.candidato-marcado {
-  background: rgba(255, 122, 60, 0.16);
-  border-left: 0.5vh solid var(--brasa);
-}
-
-.candidato-perro {
-  margin-top: 0.6vh;
-  font-size: 1.7vh;
-  color: var(--brasa);
-  opacity: 0.9;
-}
-
-/* El perro salió a explorar: sigue `presente` pero no está junto al fuego.
-   Se dibuja como ausencia —muy tenue y quieto— en vez de en su postura
-   normal, que sería mentir sobre el único dato público del juego (D10). */
-.perro-explorando {
-  opacity: 0.28;
-  filter: grayscale(1);
-}
-
-.perro-explorando .silueta-perro-cuerpo::before {
-  animation: none;
-}
-
-.candidato-nombre {
-  font-size: 2.6vh;
-}
-
-.candidato-pista {
-  font-size: 2vh;
-  opacity: 0.8;
-}
-
-.panel-espera,
-.panel-epilogo {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 1.4vh;
-  padding: var(--overscan) 8vw;
-  text-align: center;
-  /*
-    Fondo propio, como el del fogón. Sin esto las tarjetas de objetivos caen
-    literalmente encima de la fogata con 3+ jugadores (roadmap M3.5), y ahora
-    que el epílogo también muestra la revelación de la última noche el panel
-    es más alto todavía.
-  */
-  background: rgba(0, 0, 0, 0.6);
-}
-
-.espera-texto {
-  font-size: 3.4vh;
-  opacity: 0.75;
-}
-
-.epilogo-titulo {
-  font-size: 4.2vh;
-  color: var(--brasa);
-}
-
-.epilogo-perro {
-  font-size: 2.4vh;
-  opacity: 0.85;
-}
-
-.epilogo-objetivos {
-  list-style: none;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1.4vh 1.6vw;
-  justify-content: center;
-  margin-top: 1vh;
-}
-
-.epilogo-objetivos li {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3vh;
-  background: rgba(0, 0, 0, 0.4);
-  padding: 1.2vh 1.6vw;
-  max-width: 26ch;
-  clip-path: polygon(2% 3%, 98% 1%, 97% 97%, 3% 98%);
-}
-
-.objetivo-cumplido {
-  border-left: 0.4vh solid var(--brasa);
-}
-
-.objetivo-fallado {
-  border-left: 0.4vh solid rgba(232, 226, 214, 0.25);
-  opacity: 0.7;
-}
-
-.objetivo-nombre {
-  font-size: 2vh;
-  color: var(--brasa);
-}
-
-.objetivo-texto {
-  font-size: 1.8vh;
-  opacity: 0.85;
-}
-
-/* Fogón: revelación de boletas (D18). Overlay a pantalla completa, sin
-   scroll: dos columnas (ruta, raciones) más el esfuerzo abajo, la opción
-   ganadora marcada con la brasa. */
-.panel-fogon {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2.4vh;
-  padding: var(--overscan) 8vw;
-  background: rgba(0, 0, 0, 0.6);
-  text-align: center;
-}
-
-.fogon-titulo {
-  font-size: 3.4vh;
-  color: var(--brasa);
-}
-
-.fogon-columnas {
-  display: flex;
-  gap: 5vw;
-  width: 100%;
-  justify-content: center;
-}
-
-.fogon-columna {
-  flex: 1;
-  max-width: 42ch;
-  text-align: left;
-}
-
-.fogon-encabezado {
-  font-size: 1.9vh;
-  opacity: 0.65;
-  letter-spacing: 0.1em;
-  margin-bottom: 1vh;
-}
-
-.fogon-lista {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 1vh;
-}
-
-.fogon-fila {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3vh;
-  padding: 1vh 1.2vw;
-  background: rgba(0, 0, 0, 0.35);
-  border-left: 0.4vh solid rgba(232, 226, 214, 0.25);
-}
-
-.fogon-fila-gano {
-  border-left: 0.4vh solid var(--brasa);
-  background: rgba(255, 122, 60, 0.14);
-}
-
-.fogon-opcion {
-  font-size: 2.4vh;
-  text-transform: capitalize;
-}
-
-.fogon-votantes {
-  font-size: 1.8vh;
-  opacity: 0.8;
-}
-
-.fogon-esfuerzo {
-  max-width: 64ch;
-}
-
-.fogon-esfuerzo-texto {
-  font-size: 2.2vh;
-  opacity: 0.9;
-}
-
-/*
-  El bloque de revelación se usa en el fogón y, más chico, en el epílogo: la
-  última noche no pasa por el fogón y si no se muestra acá no se muestra nunca.
-*/
-.revelacion {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2.4vh;
-  width: 100%;
-}
-
-.revelacion-compacta {
-  gap: 1.2vh;
-}
-
-.revelacion-compacta .fogon-columnas {
-  gap: 3vw;
-}
-
-.revelacion-compacta .fogon-fila {
-  padding: 0.6vh 1vw;
-  gap: 0.1vh;
-}
-
-.revelacion-compacta .fogon-lista {
-  gap: 0.6vh;
-}
-
-.revelacion-compacta .fogon-opcion {
-  font-size: 1.9vh;
-}
-
-.revelacion-compacta .fogon-votantes {
-  font-size: 1.5vh;
-}
-
-.revelacion-compacta .fogon-esfuerzo-texto {
-  font-size: 1.8vh;
-}
-
-.epilogo-revelacion {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.8vh;
-}
-
-.epilogo-subtitulo {
-  font-size: 2vh;
-  opacity: 0.65;
-  letter-spacing: 0.1em;
-}
-
-/* Resolución: única cutscene dramática de la noche (D4 § tres niveles). */
-.panel-resolucion {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 15vw;
-  background: rgba(0, 0, 0, 0);
-}
-
-.animar-resolucion {
-  --duracion-resolucion: 7000ms;
-  animation: entra-resolucion var(--duracion-resolucion) ease-out;
-}
-
-@keyframes entra-resolucion {
-  0% {
-    background: rgba(0, 0, 0, 0);
-    opacity: 0;
-  }
-  15%,
-  85% {
-    background: rgba(0, 0, 0, 0.55);
-    opacity: 1;
-  }
-  100% {
-    background: rgba(0, 0, 0, 0);
-    opacity: 0;
-  }
-}
-
-.cronica-texto {
-  font-size: 3vh;
-  line-height: 1.5;
-  text-align: center;
-}
-
 @media (prefers-reduced-motion: reduce) {
   .luz-fogata {
     transition: none;
@@ -1078,4 +791,1123 @@ body::before {
   width: 4vh;
   height: 1vh;
   bottom: -0.4vh;
+}
+
+/* ------------------------------------------------------------------ */
+/* Sigo o me vuelvo                                                    */
+/* ------------------------------------------------------------------ */
+
+.juego-tv > .barra,
+.juego-tv > section,
+.juego-tv > .panel-final {
+  z-index: 5;
+}
+
+.barra {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: var(--overscan) calc(var(--overscan) * 1.2) 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 3vw;
+}
+
+.barra-noche {
+  font-size: 2.4vh;
+  opacity: 0.75;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.barra-tablero {
+  font-size: 4vh;
+  font-weight: normal;
+}
+
+.barra-sala {
+  font-size: 2.4vh;
+  opacity: 0.6;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.barra-sala strong {
+  color: var(--brasa);
+}
+
+/* Los peligros que ya salieron: es lo único que hay que tener en la cabeza
+   para decidir, así que vive arriba, siempre visible, con el ícono grande. */
+.a-la-vista {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6vh;
+  padding: 1vh 2.4vh;
+  background: rgba(20, 8, 6, 0.65);
+  border: 2px solid color-mix(in srgb, #d8452b 70%, transparent);
+  clip-path: polygon(1% 4%, 99% 0%, 98% 96%, 0% 100%);
+  transform: rotate(-0.6deg);
+}
+
+/* En la emboscada y en el balance ya no avisa nada: ya pasó. Y el cartel
+   necesita el lugar. */
+.fase-emboscada .a-la-vista,
+.fase-fin_noche .a-la-vista {
+  visibility: hidden;
+}
+
+.a-la-vista-titulo {
+  font-size: 1.8vh;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #ff9a80;
+}
+
+.a-la-vista-iconos {
+  display: flex;
+  gap: 1.4vh;
+  font-size: 4.4vh;
+  line-height: 1;
+}
+
+/* --- el cartel: lo que acaba de pasar, en una frase --- */
+
+.zona-cartel {
+  position: absolute;
+  top: 15vh;
+  left: 10vw;
+  right: 10vw;
+  height: 27vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.cartel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.4vh;
+  padding: 2.4vh 4vh;
+  background: rgba(10, 8, 6, 0.55);
+  clip-path: polygon(0.5% 3%, 99% 0%, 100% 95%, 1% 100%);
+  filter: drop-shadow(5px 7px 0 rgba(0, 0, 0, 0.45));
+  animation: entra-cartel 0.5s steps(4, end) both;
+  max-width: 80vw;
+}
+
+@keyframes entra-cartel {
+  0% { opacity: 0; transform: translateY(-2vh) rotate(-1deg); }
+  100% { opacity: 1; transform: translateY(0) rotate(0); }
+}
+
+.cartel-titulo {
+  font-size: 5.4vh;
+  line-height: 1.1;
+}
+
+.cartel-grande .cartel-titulo {
+  font-size: 9vh;
+  color: var(--brasa);
+}
+
+.cartel-texto {
+  font-size: 3.2vh;
+  line-height: 1.35;
+  max-width: 70vw;
+}
+
+.cartel-texto strong {
+  color: var(--brasa);
+  font-weight: normal;
+}
+
+.numero {
+  font-size: 5vh;
+}
+
+.cartel-aviso {
+  font-size: 2.4vh;
+  opacity: 0.75;
+}
+
+.cartel-susto {
+  background: rgba(40, 14, 8, 0.7);
+}
+
+.cartel-susto .cartel-titulo {
+  color: #ff9a80;
+}
+
+.cartel-decidir .cartel-titulo {
+  font-size: 6vh;
+}
+
+.cuenta {
+  font-size: 9vh;
+  line-height: 1;
+  color: var(--brasa);
+}
+
+.cuenta-urgente {
+  color: #ff5a3c;
+  animation: pulso-alerta 1s steps(2, end) infinite;
+}
+
+.cartel-retirada .cartel-titulo {
+  color: var(--brasa);
+}
+
+.cartel-emboscada {
+  background: rgba(80, 12, 6, 0.85);
+  padding: 3vh 6vh;
+  animation: entra-emboscada 0.6s steps(5, end) both;
+}
+
+@keyframes entra-emboscada {
+  0% { opacity: 0; transform: scale(1.6) rotate(-4deg); }
+  60% { opacity: 1; transform: scale(0.95) rotate(1deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0); }
+}
+
+.cartel-icono-grande {
+  font-size: 8vh;
+  line-height: 1;
+}
+
+.cartel-emboscada .cartel-titulo {
+  font-size: 6.4vh;
+  color: #ffd2c4;
+}
+
+.lista-perdidas {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1vh 3vh;
+  font-size: 3.4vh;
+}
+
+.lista-perdidas strong {
+  color: #ff7a6a;
+}
+
+.cartel-balance {
+  min-width: 46vw;
+}
+
+.balance {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(18vw, 1fr));
+  gap: 0.6vh 4vw;
+  font-size: 2.8vh;
+  width: 100%;
+}
+
+.balance li {
+  display: flex;
+  justify-content: space-between;
+  gap: 2vw;
+  border-bottom: 1px solid rgba(232, 226, 214, 0.15);
+  padding-bottom: 0.4vh;
+}
+
+.balance-gano strong {
+  color: var(--brasa);
+}
+
+.balance-perdio strong {
+  color: #ff7a6a;
+}
+
+/* La pantalla entera se tiñe una vez. Es el único golpe visual del juego. */
+.destello {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 45%, rgba(220, 40, 20, 0.45), rgba(80, 0, 0, 0.75));
+  animation: destello 1.2s steps(6, end) both;
+}
+
+@keyframes destello {
+  0% { opacity: 0; }
+  15% { opacity: 1; }
+  100% { opacity: 0.55; }
+}
+
+.fase-emboscada .zona-cartel,
+.fase-emboscada .camino {
+  animation: sacudon 0.5s steps(5, end) 1;
+}
+
+@keyframes sacudon {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(-1.2vh, 0.6vh); }
+  40% { transform: translate(1.2vh, -0.6vh); }
+  60% { transform: translate(-0.8vh, 0.4vh); }
+  80% { transform: translate(0.6vh, 0); }
+}
+
+/* --- el camino: los tramos que ya se dieron vuelta --- */
+
+.camino {
+  position: absolute;
+  top: 44vh;
+  left: 4vw;
+  right: 4vw;
+  height: 17vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1vw;
+}
+
+.carta {
+  /* Se achican cuando hay muchas: el camino entero tiene que entrar en una fila. */
+  --ancho: min(11vh, calc(88vw / var(--cartas) - 1vw));
+  width: var(--ancho);
+  height: calc(var(--ancho) * 1.4);
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4vh;
+  padding: 0.6vh;
+  text-align: center;
+  background: #e9dcc2;
+  color: #2a1f14;
+  clip-path: polygon(3% 1%, 97% 3%, 99% 97%, 1% 99%);
+  filter: drop-shadow(4px 6px 0 rgba(0, 0, 0, 0.5));
+  position: relative;
+}
+
+.carta:nth-child(odd) {
+  transform: rotate(-1.5deg);
+}
+
+.carta:nth-child(even) {
+  transform: rotate(1.2deg);
+}
+
+.carta-valor {
+  font-size: calc(var(--ancho) * 0.45);
+  line-height: 1;
+  color: #7a4d10;
+}
+
+.carta-nombre {
+  font-size: max(1.3vh, calc(var(--ancho) * 0.13));
+  line-height: 1.1;
+}
+
+.carta-resto {
+  position: absolute;
+  bottom: 0.6vh;
+  font-size: max(1.2vh, calc(var(--ancho) * 0.12));
+  background: #7a4d10;
+  color: #f4e7cc;
+  padding: 0.1vh 0.6vh;
+}
+
+.carta-peligro {
+  background: #3a2a24;
+  color: #f0d8c8;
+}
+
+.carta-icono {
+  font-size: calc(var(--ancho) * 0.5);
+  line-height: 1;
+}
+
+.carta-letal {
+  background: #a3261a;
+  color: #fff0e8;
+}
+
+/* Darse vuelta, cuadro por cuadro. */
+.carta-nueva {
+  animation: da-vuelta 0.7s steps(5, end) both;
+}
+
+@keyframes da-vuelta {
+  0% { transform: scaleX(0) translateY(-3vh); }
+  50% { transform: scaleX(0.4) translateY(-1.5vh) rotate(3deg); }
+  100% { transform: scaleX(1) translateY(0) rotate(-1deg); }
+}
+
+/* --- la escena: campamento a la izquierda, camino a la derecha --- */
+
+.escena {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 37vh;
+  display: flex;
+  align-items: flex-end;
+  padding: 0 4vw var(--overscan);
+}
+
+.campamento,
+.sendero {
+  position: relative;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.campamento {
+  flex: 0 0 34%;
+  gap: 1vw;
+}
+
+.sendero {
+  flex: 1;
+  border-left: 2px dashed rgba(232, 226, 214, 0.18);
+}
+
+.campamento .fogata-container {
+  margin-bottom: 2vh;
+  flex: none;
+}
+
+.rotulo {
+  position: absolute;
+  top: 1vh;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 1.8vh;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0.45;
+}
+
+.grupo {
+  display: flex;
+  align-items: flex-end;
+  gap: 1.8vw;
+  padding-bottom: 2vh;
+  flex-wrap: wrap-reverse;
+  justify-content: center;
+}
+
+.grupo-campamento {
+  max-width: 60%;
+  gap: 1vw;
+}
+
+.silueta-viajero {
+  position: relative;
+  opacity: 1;
+}
+
+.silueta-viajero.desconectado {
+  opacity: 0.45;
+}
+
+.lugar-campamento .silueta-avatar-sombra {
+  transform: scale(0.85);
+}
+
+/* El atrapado se cae y queda en el camino, apagado: ahí se ve quién perdió.
+   La pose final está fija y la animación solo la recorre: con movimiento
+   reducido tiene que verse caído igual. */
+.lugar-atrapado .silueta-avatar-sombra {
+  transform: rotate(90deg) translateY(2vh) translateX(1vh);
+  animation: caida-quebrado 0.5s steps(4, end) forwards;
+}
+
+.lugar-atrapado {
+  opacity: 0.55;
+}
+
+/* Lo que carga cada uno, encima de la cabeza: es público y es lo que se grita. */
+.mochila {
+  font-size: 3vh;
+  min-width: 4.4vh;
+  text-align: center;
+  padding: 0.2vh 0.8vh;
+  background: #e9dcc2;
+  color: #5a3a0c;
+  clip-path: polygon(4% 6%, 96% 0%, 100% 94%, 0% 100%);
+  margin-bottom: 0.4vh;
+}
+
+.globo {
+  position: absolute;
+  bottom: calc(100% + 0.4vh);
+  left: 50%;
+  transform: translateX(-50%) rotate(-2deg);
+  white-space: nowrap;
+  font-size: 2.2vh;
+  padding: 0.4vh 1vh;
+  clip-path: polygon(3% 4%, 97% 0%, 100% 96%, 0% 100%);
+  animation: entra-globo 0.4s steps(3, end) both;
+}
+
+@keyframes entra-globo {
+  0% { opacity: 0; transform: translateX(-50%) translateY(1vh) scale(0.6); }
+  100% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1) rotate(-2deg); }
+}
+
+.globo-duda {
+  background: rgba(232, 226, 214, 0.2);
+  font-size: 2.8vh;
+}
+
+.globo-listo {
+  background: rgba(232, 226, 214, 0.85);
+  color: #1a140e;
+  font-size: 2.8vh;
+}
+
+.globo-sigo {
+  background: #e9dcc2;
+  color: #1a140e;
+}
+
+.globo-vuelvo {
+  background: var(--brasa);
+  color: #1a0c04;
+}
+
+.silueta-viajero .silueta-cabeza {
+  width: 3.4vh;
+  height: 3.4vh;
+}
+
+.silueta-viajero .silueta-avatar {
+  width: 7vh;
+  height: 8.6vh;
+}
+
+.silueta-viajero .silueta-nombre {
+  font-size: 2.4vh;
+}
+
+.silueta-perro {
+  margin-left: 1vw;
+}
+
+.silueta-perro .silueta-nombre {
+  font-size: 1.8vh;
+  opacity: 0.7;
+}
+
+.silueta-perro.alerta-no_avanza .silueta-nombre {
+  color: var(--brasa);
+  opacity: 1;
+}
+
+/* --- el final --- */
+
+.panel-final {
+  position: absolute;
+  inset: 12vh 10vw var(--overscan);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2vh;
+  text-align: center;
+}
+
+.final-sobre {
+  font-size: 2.4vh;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  opacity: 0.7;
+}
+
+.final-titulo {
+  font-size: 7vh;
+  color: var(--brasa);
+  font-weight: normal;
+}
+
+.podio {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8vh;
+  width: min(70vw, 90vh);
+}
+
+.podio-fila {
+  display: grid;
+  grid-template-columns: 6vh 1fr auto;
+  align-items: baseline;
+  gap: 2vw;
+  padding: 0.6vh 2vh;
+  font-size: 3vh;
+  background: rgba(10, 8, 6, 0.5);
+  clip-path: polygon(0.5% 6%, 99.5% 0%, 100% 94%, 0% 100%);
+  animation: entra-podio 0.5s steps(4, end) both;
+}
+
+@keyframes entra-podio {
+  0% { opacity: 0; transform: translateX(-4vw); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+
+.podio-primero {
+  font-size: 4vh;
+  background: color-mix(in srgb, var(--brasa) 30%, rgba(10, 8, 6, 0.6));
+}
+
+.podio-puesto {
+  opacity: 0.6;
+}
+
+.podio-nombre {
+  text-align: left;
+}
+
+.podio-baul small {
+  font-size: 0.6em;
+  opacity: 0.7;
+}
+
+.premios {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1.4vh 2vw;
+  max-width: 80vw;
+}
+
+.premio {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3vh;
+  padding: 1vh 1.8vh;
+  background: #e9dcc2;
+  color: #2a1f14;
+  clip-path: polygon(2% 4%, 98% 0%, 100% 96%, 0% 100%);
+  transform: rotate(-1deg);
+  min-width: 20vw;
+}
+
+.premio:nth-child(even) {
+  transform: rotate(1.2deg);
+}
+
+.premio-titulo {
+  font-size: 1.8vh;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #7a4d10;
+}
+
+.premio-jugador {
+  font-size: 3.4vh;
+}
+
+.premio-detalle {
+  font-size: 2vh;
+}
+
+.final-pie {
+  margin-top: auto;
+  font-size: 2.6vh;
+  opacity: 0.75;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cartel,
+  .cartel-emboscada,
+  .carta-nueva,
+  .globo,
+  .podio-fila,
+  .cuenta-urgente,
+  .fase-emboscada .zona-cartel,
+  .fase-emboscada .camino,
+  .lugar-atrapado .silueta-avatar-sombra {
+    animation: none;
+  }
+
+  .destello {
+    animation: none;
+    opacity: 0.5;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Sala: lo primero que ve una mesa que nunca jugó                     */
+/* ------------------------------------------------------------------ */
+
+:root {
+  --papel: #efe3c8;
+  --papel-sombra: #d9c9a6;
+  --papel-tinta: #2a1f14;
+  --papel-acento: #8a5512;
+  --peligro: #c8321f;
+}
+
+.aviso-pantalla {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2vh;
+  text-align: center;
+  background: radial-gradient(circle at 50% 60%, #1a2238, var(--cielo));
+}
+
+.aviso-titulo {
+  font-size: 6vh;
+}
+
+.aviso-texto {
+  font-size: 3vh;
+  opacity: 0.7;
+}
+
+.sala {
+  position: relative;
+  height: 100%;
+  padding: var(--overscan) calc(var(--overscan) * 1.4);
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 3vh;
+  background-image:
+    linear-gradient(180deg, rgba(11, 16, 32, 0.55) 0%, rgba(11, 16, 32, 0.25) 45%, rgba(11, 16, 32, 0.85) 100%),
+    url("/fondos/amanecer-sierra.jpg");
+  background-size: cover;
+  background-position: center bottom;
+}
+
+.sala-cabecera {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.sala-marca {
+  font-size: 8vh;
+  line-height: 1;
+  font-weight: normal;
+  color: var(--brasa);
+  text-shadow: 0.3vh 0.5vh 0 rgba(0, 0, 0, 0.45);
+}
+
+.sala-bajada {
+  font-size: 3vh;
+  margin-top: 1vh;
+  opacity: 0.9;
+}
+
+.sala-volver {
+  font-size: 2vh;
+  color: var(--tinta);
+  opacity: 0.55;
+  text-decoration: none;
+  padding: 0.6vh 1.4vh;
+  border: 1px solid rgba(232, 226, 214, 0.35);
+}
+
+.sala-cuerpo {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 5vw;
+  align-items: center;
+  min-height: 0;
+}
+
+/* --- cómo se juega: tres papelitos pegados --- */
+
+.como-se-juega {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2vw;
+  align-self: center;
+}
+
+.paso-regla {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 1vh;
+  padding: 3vh 2.4vh 2.6vh;
+  background: var(--papel);
+  color: var(--papel-tinta);
+  clip-path: polygon(2% 1%, 98% 3%, 100% 97%, 0% 99%);
+  filter: drop-shadow(0.5vh 0.8vh 0 rgba(0, 0, 0, 0.45));
+}
+
+.paso-regla:nth-child(1) { transform: rotate(-1.4deg); }
+.paso-regla:nth-child(2) { transform: rotate(0.8deg) translateY(1vh); }
+.paso-regla:nth-child(3) { transform: rotate(-0.6deg); }
+
+.paso-numero {
+  position: absolute;
+  top: 1.4vh;
+  right: 1.8vh;
+  font-size: 3vh;
+  color: var(--papel-acento);
+  opacity: 0.6;
+}
+
+.paso-icono {
+  font-size: 6vh;
+  line-height: 1;
+}
+
+.paso-titulo {
+  font-size: 3.2vh;
+  line-height: 1.15;
+}
+
+.paso-texto {
+  font-size: 2.4vh;
+  line-height: 1.35;
+  opacity: 0.85;
+}
+
+/* El cierre de las reglas va abajo, a lo ancho, como una cinta. */
+.paso-gana {
+  grid-column: 1 / -1;
+  padding: 1.4vh 2.4vh;
+  background: var(--brasa);
+  color: #1a0c04;
+  text-align: center;
+  transform: rotate(0.4deg);
+}
+
+.paso-gana .paso-titulo {
+  font-size: 3vh;
+}
+
+/* --- sumate: QR y código, lo único que hay que leer de lejos --- */
+
+.sumate {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.8vh;
+  padding: 2.6vh 3vh;
+  background: var(--papel);
+  color: var(--papel-tinta);
+  clip-path: polygon(3% 0%, 100% 2%, 97% 100%, 0% 98%);
+  filter: drop-shadow(0.6vh 0.9vh 0 rgba(0, 0, 0, 0.5));
+  transform: rotate(1.2deg);
+}
+
+.sumate-titulo {
+  font-size: 2.8vh;
+}
+
+.sumate-qr img,
+.sumate-qr span {
+  display: block;
+  width: 28vh;
+  height: 28vh;
+}
+
+.sumate-url {
+  font-size: 2vh;
+  opacity: 0.8;
+}
+
+.sumate-codigo-label {
+  margin-top: 0.6vh;
+  font-size: 1.8vh;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  opacity: 0.6;
+}
+
+.sumate-codigo {
+  font-size: 10vh;
+  line-height: 0.9;
+  letter-spacing: 0.14em;
+  color: var(--papel-acento);
+}
+
+/* --- la caravana que se va armando --- */
+
+.sala-pie {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 4vw;
+}
+
+.caravana-sala {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1.6vw;
+  min-height: 16vh;
+}
+
+.ficha-viajero {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4vh;
+  animation: entra-ficha 0.5s steps(4, end) both;
+}
+
+@keyframes entra-ficha {
+  0% { opacity: 0; transform: translateY(3vh); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.ficha-viajero .silueta-cabeza {
+  width: 3vh;
+  height: 3vh;
+}
+
+.ficha-viajero .silueta-avatar {
+  width: 6vh;
+  height: 7.4vh;
+}
+
+.ficha-nombre {
+  font-size: 2.4vh;
+}
+
+.ficha-estado {
+  font-size: 1.8vh;
+  opacity: 0.6;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.ficha-lista .ficha-estado {
+  opacity: 1;
+  color: var(--brasa);
+}
+
+.ficha-lista .silueta-avatar-sombra {
+  filter: drop-shadow(0 0 1.4vh color-mix(in srgb, var(--brasa) 70%, transparent));
+}
+
+/* Lugares vacíos: se ve cuánta gente falta para que tenga gracia. */
+.ficha-vacia {
+  opacity: 0.6;
+  animation: none;
+}
+
+.ficha-vacia .silueta-cabeza,
+.ficha-vacia .silueta-avatar {
+  background: rgba(232, 226, 214, 0.22);
+}
+
+.ficha-vacia .silueta-avatar-sombra {
+  filter: none;
+}
+
+.ficha-viajero:hover .boton-quitar,
+.ficha-viajero:focus-within .boton-quitar {
+  opacity: 1;
+}
+
+.sala-lateral {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1.6vh;
+  text-align: right;
+}
+
+.votacion-titulo {
+  font-size: 1.8vh;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  opacity: 0.6;
+  margin-bottom: 0.8vh;
+}
+
+.votacion-opciones {
+  display: flex;
+  gap: 1vw;
+  justify-content: flex-end;
+}
+
+.ficha-tablero {
+  display: flex;
+  align-items: baseline;
+  gap: 1vh;
+  padding: 0.8vh 1.6vh;
+  font-size: 2.4vh;
+  border: 2px solid rgba(232, 226, 214, 0.35);
+  clip-path: polygon(2% 4%, 98% 0%, 100% 96%, 0% 100%);
+}
+
+.ficha-tablero strong {
+  font-weight: normal;
+  opacity: 0.7;
+}
+
+.ficha-tablero-gana {
+  background: var(--papel);
+  color: var(--papel-tinta);
+  border-color: var(--papel);
+}
+
+.sala-estado {
+  font-size: 3vh;
+  max-width: 40vw;
+}
+
+/* --- la cuenta regresiva tapa todo: ya no hay nada más que mirar --- */
+
+.cuenta-sala {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(8, 10, 18, 0.72);
+}
+
+.cuenta-sala-texto {
+  font-size: 3.4vh;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  opacity: 0.8;
+}
+
+.cuenta-sala-numero {
+  font-size: 30vh;
+  line-height: 1;
+  color: var(--brasa);
+  animation: late 1s steps(4, end) both;
+}
+
+@keyframes late {
+  0% { transform: scale(1.4); opacity: 0; }
+  30% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(0.92); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ficha-viajero,
+  .cuenta-sala-numero {
+    animation: none;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Juego: detalles de lectura                                           */
+/* ------------------------------------------------------------------ */
+
+.barra-noche {
+  display: flex;
+  align-items: center;
+  gap: 1.2vh;
+  margin-top: 0.6vh;
+}
+
+/* Las noches como lunas: se ve de reojo cuánto falta. */
+.lunas {
+  display: inline-flex;
+  gap: 0.7vh;
+}
+
+.luna {
+  width: 1.8vh;
+  height: 1.8vh;
+  border-radius: 50%;
+  border: 2px solid rgba(232, 226, 214, 0.5);
+}
+
+.luna-pasada {
+  background: rgba(232, 226, 214, 0.5);
+  border-color: transparent;
+}
+
+.luna-actual {
+  background: var(--tinta);
+  border-color: var(--tinta);
+  box-shadow: 0 0 1.2vh rgba(232, 226, 214, 0.7);
+}
+
+/* El perro habla en globo: es el único dato público, tiene que verse. */
+.silueta-perro {
+  position: relative;
+}
+
+.globo-perro {
+  position: absolute;
+  bottom: calc(100% + 0.6vh);
+  left: 50%;
+  transform: translateX(-50%) rotate(3deg);
+  white-space: nowrap;
+  padding: 0.4vh 1.2vh;
+  font-size: 2.4vh;
+  background: rgba(232, 226, 214, 0.9);
+  color: #1a140e;
+  clip-path: polygon(4% 0%, 100% 6%, 96% 100%, 0% 92%);
+  animation: entra-globo 0.4s steps(3, end) both;
+}
+
+.globo-perro-inquieto {
+  background: #f0c060;
+}
+
+.globo-perro-grune {
+  background: var(--peligro);
+  color: #fff3ea;
+  font-size: 3vh;
+}
+
+.silueta-perro .silueta-nombre {
+  font-size: 2vh;
+}
+
+/* Lo tirado vive pegado al camino: es la tentación de volverse. */
+.tirado-chip {
+  position: absolute;
+  top: 0.6vh;
+  right: 0;
+  font-size: 2.2vh;
+  padding: 0.4vh 1.2vh;
+  background: var(--papel);
+  color: var(--papel-tinta);
+  clip-path: polygon(2% 6%, 100% 0%, 98% 100%, 0% 94%);
+  animation: entra-globo 0.4s steps(3, end) both;
+}
+
+.tirado-chip strong {
+  color: var(--papel-acento);
+  font-size: 2.8vh;
+  font-weight: normal;
+}
+
+.rotulo {
+  font-size: 2vh;
+  opacity: 0.55;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .globo-perro,
+  .tirado-chip {
+    animation: none;
+  }
+}
+
+/* El perro a escala de la gente: es el único dato público, no puede ser un
+   detalle del fondo. La postura (escalera de alertas) sigue en la figura de
+   adentro; acá solo se agranda el conjunto. */
+.silueta-perro .silueta-avatar-sombra-perro {
+  transform: scale(1.7);
+  transform-origin: bottom center;
+  margin: 0 1.6vh 0.6vh;
 }

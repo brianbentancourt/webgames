@@ -1,232 +1,230 @@
-import { useState, useEffect } from 'react';
-import type { VistaJugador } from '@salvese/core';
-import {
-  PantallaRuta,
-  PantallaRaciones,
-  PantallaRepartirEsfuerzo,
-  PantallaMandarPerro,
-  PantallaEpilogo,
-  PantallaBloquear,
-  PantallaTrato,
-  PantallaEntregarObjeto,
-} from './Acciones.js';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import type { MensajeEntrante, VistaJugador } from '@salvese/core';
+import { Marco } from './Marco.js';
 
-interface Props {
-  vista: VistaJugador;
-  mandar: (msg: any) => void;
+/**
+ * El celular durante la partida. Una sola cosa por pantalla, y casi siempre esa
+ * cosa es "mirá la tele". Lo único que se toca es sigo o me vuelvo.
+ *
+ * Cada pantalla tiene la misma forma: una etiqueta chica (dónde estás), un
+ * titular grande (qué pasa) y, abajo, tus dos números: lo que cargás —que se
+ * puede perder— y lo que guardaste —que no—.
+ */
+
+function useSegundos(restanteMs: number | null, paso: number): number | null {
+  const [vence, setVence] = useState<number | null>(null);
+  const [ahora, setAhora] = useState(() => Date.now());
+  useEffect(() => {
+    setVence(restanteMs === null ? null : Date.now() + restanteMs);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paso, restanteMs === null]);
+  useEffect(() => {
+    if (vence === null) return;
+    const id = setInterval(() => setAhora(Date.now()), 250);
+    return () => clearInterval(id);
+  }, [vence]);
+  return vence === null ? null : Math.max(0, Math.ceil((vence - ahora) / 1000));
 }
 
-export function JuegoControl({ vista, mandar }: Props) {
-  const [paso, setPaso] = useState(0);
-  const [boleta, setBoleta] = useState<any>({});
-  // "No lo mando" es una decisión real (A2), no una lista vacía como en el
-  // esfuerzo: no hay nada que mandarle al servidor para registrarla, así que
-  // vive acá nomás. Se resetea con lo demás al cambiar de noche — si el
-  // Capataz recarga antes de decidir, es correcto que la pantalla vuelva.
-
-  // Resetear paso si cambia la fase o la noche
-  useEffect(() => {
-    setPaso(0);
-    setBoleta({});
-  }, [vista.fase, vista.noche]);
-
-  // El pago del epílogo (A3): pantalla propia, sin wizard. Antes de esto acá
-  // caía en el genérico "no te toca ninguna acción" de más abajo, que es
-  // justo el problema que describe el plan: la persona que más le prestó
-  // atención a su rol era la que menos se enteraba de cómo terminó.
-  if (vista.fase === 'epilogo' && vista.miDesenlace) {
-    return (
-      <main className="pantalla">
-        <p className="titulo" style={{ marginBottom: 4 }}>{vista.yo.nombre}</p>
-        <p style={{ fontSize: '13px', opacity: 0.65, letterSpacing: '0.02em', textTransform: 'uppercase' }}>Secreto: {vista.yo.objetivo}</p>
-        <PantallaEpilogo desenlace={vista.miDesenlace} />
-      </main>
-    );
-  }
-
-  // El reparto del esfuerzo es independiente de la boleta (D19): no depende
-  // de haber bloqueado ruta y raciones, ni al revés. Por eso se resuelve acá,
-  // antes que el wizard de la boleta y con su propia pantalla, en vez de ser
-  // un paso más del array `acciones`.
-  //
-  // Si ya repartió, la pantalla no se fuerza más: eso lo dice el servidor con
-  // `yaReparti`, no un `useState` local. Con estado local se perdía al recargar
-  // el celular y el Capataz volvía a ver la pantalla de reparto a mitad de la
-  // noche, pudiendo pisar sin querer lo que ya había decidido.
-  const accionEsfuerzo = vista.acciones.find((a) => a.tipo === 'repartir_esfuerzo');
-  if (accionEsfuerzo && accionEsfuerzo.tipo === 'repartir_esfuerzo' && !accionEsfuerzo.yaReparti) {
-    return (
-      <main className="pantalla">
-        <p className="titulo" style={{ marginBottom: 4 }}>{vista.yo.nombre}</p>
-        <p style={{ fontSize: '13px', opacity: 0.65, letterSpacing: '0.02em', textTransform: 'uppercase' }}>Secreto: {vista.yo.objetivo}</p>
-        <PantallaRepartirEsfuerzo
-          accion={accionEsfuerzo}
-          onConfirmar={(ids) => mandar({ t: 'asignar_esfuerzo', a: ids })}
-        />
-      </main>
-    );
-  }
-
-  // Mandar al perro a explorar (A2, D10): pantalla propia, antes del wizard,
-  // igual que el reparto del esfuerzo de arriba — y con el mismo criterio,
-  // que es lo que importa: "que se quede" también se le manda al servidor y
-  // la pantalla se apaga con `yaDecidio`, no con un `useState` local. Con
-  // estado local, decir que no y después recargar el celular hacía volver la
-  // pantalla a mitad de la noche (D4: el estado vive en el servidor).
-  const accionPerro = vista.acciones.find((a) => a.tipo === 'mandar_perro');
-  if (accionPerro && accionPerro.tipo === 'mandar_perro' && !accionPerro.yaDecidio) {
-    return (
-      <main className="pantalla">
-        <p className="titulo" style={{ marginBottom: 4 }}>{vista.yo.nombre}</p>
-        <p style={{ fontSize: '13px', opacity: 0.65, letterSpacing: '0.02em', textTransform: 'uppercase' }}>Secreto: {vista.yo.objetivo}</p>
-        <PantallaMandarPerro
-          onMandar={() => mandar({ t: 'mandar_perro_a_explorar', manda: true })}
-          onOmitir={() => mandar({ t: 'mandar_perro_a_explorar', manda: false })}
-        />
-      </main>
-    );
-  }
-
-  // Si ya tiene una boleta confirmada desde el servidor y no queda pendiente
-  // más que el reparto del esfuerzo o mandar al perro (ya resueltos arriba),
-  // mostramos el resumen.
-  if (
-    vista.boleta &&
-    vista.acciones.every((a) => a.tipo === 'repartir_esfuerzo' || a.tipo === 'mandar_perro')
-  ) {
-    return (
-      <main className="pantalla">
-        <p className="titulo" style={{ marginBottom: 4 }}>{vista.yo.nombre}</p>
-        <p style={{ fontSize: '13px', opacity: 0.65, letterSpacing: '0.02em', textTransform: 'uppercase' }}>Secreto: {vista.yo.objetivo}</p>
-        <div className="resumen-boleta">
-          <p>Decisión bloqueada.</p>
-          <p className="al-pie">Mirá la TV para ver el resultado.</p>
-        </div>
-      </main>
-    );
-  }
-
-  // El reparto del esfuerzo y mandar al perro ya se resolvieron arriba (con
-  // su propia pantalla, si correspondía): de acá para abajo el wizard
-  // trabaja solo con el resto.
-  const accionesSinEsfuerzo = vista.acciones.filter(
-    (a) => a.tipo !== 'repartir_esfuerzo' && a.tipo !== 'mandar_perro',
+function Lunas({ noche, total }: { noche: number; total: number }) {
+  return (
+    <span className="lunas" aria-label={`noche ${noche} de ${total}`}>
+      {Array.from({ length: total }, (_, i) => (
+        <span key={i} className={`luna ${i + 1 < noche ? 'luna-pasada' : i + 1 === noche ? 'luna-actual' : ''}`} />
+      ))}
+    </span>
   );
+}
 
-  // Si hay una línea del tutorial, obligar a decirla y mostrar un botón de Continuar
-  if (vista.linea && paso === 0) {
-    return (
-      <main className="pantalla">
-        <p className="titulo" style={{ marginBottom: 4 }}>{vista.yo.nombre}</p>
-        <p style={{ fontSize: '13px', opacity: 0.65, letterSpacing: '0.02em', textTransform: 'uppercase' }}>Secreto: {vista.yo.objetivo}</p>
-        <p className="linea">{vista.linea}</p>
-        <button className="boton-primario" style={{ marginTop: 'auto' }} onClick={() => setPaso(1)}>
-          LISTO
-        </button>
-      </main>
-    );
-  }
+function Numeros({ vista }: { vista: VistaJugador }) {
+  const enCamino = vista.yo.lugar === 'camino' && vista.fase !== 'fin_noche' && vista.fase !== 'final';
+  return (
+    <div className="numeros">
+      <div className={`numero-caja ${enCamino ? '' : 'numero-apagado'}`}>
+        <span className="numero-etiqueta">cargás</span>
+        <span className="numero-valor">{enCamino ? vista.yo.mochila : '—'}</span>
+        <span className="numero-nota">se puede perder</span>
+      </div>
+      <div className="numero-caja numero-baul">
+        <span className="numero-etiqueta">tu baúl 🔒</span>
+        <span className="numero-valor">{vista.yo.baul}</span>
+        <span className="numero-nota">secreto</span>
+      </div>
+    </div>
+  );
+}
 
-  // Si no hay acciones pendientes para él, mostrar "esperá / hablá"
-  if (accionesSinEsfuerzo.length === 0) {
-    return (
-      <main className="pantalla">
-        <p className="titulo" style={{ marginBottom: 4 }}>{vista.yo.nombre}</p>
-        <p style={{ fontSize: '13px', opacity: 0.65, letterSpacing: '0.02em', textTransform: 'uppercase' }}>Secreto: {vista.yo.objetivo}</p>
-        <p className="linea">No te toca ninguna acción. Hablá con el grupo.</p>
-        {vista.revelacion && (
-          <div className="revelacion" style={{ marginTop: 20 }}>
-            <p className="titulo">INFORMACIÓN SECRETA</p>
-            {vista.revelacion.tipo === 'terreno' && <p>{vista.revelacion.texto}</p>}
-            {vista.revelacion.tipo === 'gente' && (
-              <ul className="lista-revelacion">
-                {vista.revelacion.filas.map((f, i) => (
-                  <li key={i}>{f.nombre}: {f.estado}</li>
-                ))}
-              </ul>
-            )}
-            {vista.revelacion.tipo === 'inventario' && (
-              <p>Quedan {vista.revelacion.recurso} de {vista.revelacion.capacidad} {vista.revelacion.nombreRecurso}.</p>
-            )}
-            {vista.revelacion.tipo === 'registro' && <p>{vista.revelacion.texto}</p>}
-            {vista.revelacion.tipo === 'mando' && <p>{vista.revelacion.texto}</p>}
-          </div>
-        )}
-      </main>
-    );
-  }
+function Estado({
+  tono,
+  icono,
+  etiqueta,
+  titulo,
+  texto,
+}: {
+  tono: 'neutro' | 'calido' | 'peligro' | 'bien';
+  icono: string;
+  etiqueta: string;
+  titulo: ReactNode;
+  texto?: ReactNode;
+}) {
+  return (
+    <div className={`estado estado-${tono}`}>
+      <span className="estado-icono" aria-hidden>
+        {icono}
+      </span>
+      <p className="estado-etiqueta">{etiqueta}</p>
+      <p className="estado-titulo">{titulo}</p>
+      {texto !== undefined && <p className="estado-texto">{texto}</p>}
+    </div>
+  );
+}
 
-  // Flujo normal de acciones (wizard)
-  const indiceAccion = vista.linea ? paso - 1 : paso;
-  const accionActual = accionesSinEsfuerzo[indiceAccion];
+export function JuegoControl({ vista, mandar }: { vista: VistaJugador; mandar: (m: MensajeEntrante) => void }) {
+  const segundos = useSegundos(vista.restanteMs, vista.paso);
+  const [pidioRevancha, setPidioRevancha] = useState(false);
+  const yaVibro = useRef(-1);
 
-  if (!accionActual) {
-    // Ya completó todo localmente pero no bloqueó (o esperando respuesta de server)
-    return (
-      <main className="pantalla">
-        <p className="titulo" style={{ marginBottom: 4 }}>{vista.yo.nombre}</p>
-        <p style={{ fontSize: '13px', opacity: 0.65, letterSpacing: '0.02em', textTransform: 'uppercase' }}>Secreto: {vista.yo.objetivo}</p>
-        <p className="titulo">Enviando...</p>
-      </main>
-    );
-  }
-
-  const handleSiguiente = (key: string, valor: any) => {
-    const nuevaBoleta = { ...boleta, [key]: valor };
-    setBoleta(nuevaBoleta);
-
-    // Si es acción directa (ej: votar_tablero, responder_trato, elegir, bloquear)
-    if (accionActual.tipo === 'responder_trato') {
-      mandar({ t: 'responder_trato', acepta: valor });
-      setPaso(paso + 1);
-    } else if (accionActual.tipo === 'votar_tablero') {
-      mandar({ t: 'votar_tablero', tablero: valor });
-      setPaso(paso + 1);
-    } else if (accionActual.tipo === 'entregar_objeto') {
-      mandar({ t: 'entregar_objeto', objeto: accionActual.objeto, a: valor });
-      setPaso(paso + 1);
-    } else if (accionActual.tipo === 'bloquear') {
-      mandar({
-        t: 'elegir',
-        ruta: nuevaBoleta.ruta,
-        raciones: nuevaBoleta.raciones,
-      });
-      mandar({ t: 'bloquear' });
-      setPaso(paso + 1);
-    } else {
-      // Avanzar al siguiente paso del wizard local
-      setPaso(paso + 1);
+  // Que el celular avise cuando hay que decidir: la cabeza está en la mesa,
+  // no en la pantalla.
+  useEffect(() => {
+    if (vista.puedoElegir && yaVibro.current !== vista.paso) {
+      yaVibro.current = vista.paso;
+      try {
+        navigator.vibrate?.(60);
+      } catch {
+        // sin vibración, sin drama
+      }
     }
-  };
+  }, [vista.puedoElegir, vista.paso]);
+
+  useEffect(() => {
+    if (vista.fase !== 'final') setPidioRevancha(false);
+  }, [vista.fase]);
+
+  const { yo, tesoro } = vista;
+  const ficha = { color: yo.color, nombre: yo.nombre };
+  const lunas = vista.fase === 'final' ? null : <Lunas noche={vista.noche} total={vista.nochesTotales} />;
+
+  /* --- el final --- */
+  if (vista.fase === 'final' && vista.final) {
+    const f = vista.final;
+    return (
+      <Marco ficha={ficha} clase="marco-final">
+        <div className={`estado ${f.puesto === 1 ? 'estado-calido' : 'estado-neutro'}`}>
+          <span className="estado-icono" aria-hidden>
+            {f.puesto === 1 ? '🏆' : f.puesto === f.de ? '🪦' : '🎒'}
+          </span>
+          <p className="estado-etiqueta">fin de la travesía</p>
+          <p className="estado-titulo">{f.puesto === 1 ? '¡Ganaste!' : `Saliste ${f.puesto}º de ${f.de}`}</p>
+          <p className="estado-texto">
+            Juntaste <strong className="dato">{f.baul}</strong> de {tesoro}.
+          </p>
+          {f.premios.length > 0 && (
+            <ul className="premios-celu">
+              {f.premios.map((p) => (
+                <li key={p}>{p}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <div className="pie-accion">
+          <button
+            disabled={pidioRevancha}
+            onClick={() => {
+              setPidioRevancha(true);
+              mandar({ t: 'revancha' });
+            }}
+          >
+            {pidioRevancha ? 'arrancando…' : 'otra partida'}
+          </button>
+        </div>
+      </Marco>
+    );
+  }
+
+  /* --- la decisión: dos botones que se tocan sin mirar --- */
+  if (vista.fase === 'decidir' && vista.puedoElegir) {
+    const solo = vista.compania === 0;
+    return (
+      <Marco ficha={ficha} derecha={lunas} clase="marco-decidir">
+        <div className="decidir-encabezado">
+          <p className="decidir-carga">
+            cargás <strong>{yo.mochila}</strong> de {tesoro}
+          </p>
+          <p className="decidir-reloj">
+            {segundos !== null && <span className={segundos <= 5 ? 'urgente' : ''}>{segundos}</span>}
+          </p>
+        </div>
+        <button className="boton-gigante boton-sigo" onClick={() => mandar({ t: 'elegir', opcion: 'sigo' })}>
+          <span className="boton-gigante-texto">sigo</span>
+          <span className="boton-gigante-nota">{solo ? 'solo en el camino' : `con ${vista.compania} más`}</span>
+        </button>
+        <button className="boton-gigante boton-vuelvo" onClick={() => mandar({ t: 'elegir', opcion: 'vuelvo' })}>
+          <span className="boton-gigante-texto">me vuelvo</span>
+          <span className="boton-gigante-nota">
+            guardás {yo.mochila}
+            {vista.tirado > 0 ? ` + hasta ${vista.tirado} tirados` : ''}
+          </span>
+        </button>
+        <p className="pie-decidir">si no elegís, seguís</p>
+      </Marco>
+    );
+  }
+
+  /* --- todo lo demás: mirá la tele --- */
+  let estado: ReactNode;
+
+  if (vista.fase === 'fin_noche' && vista.miNoche) {
+    const { ganado, perdido } = vista.miNoche;
+    estado =
+      perdido > 0 ? (
+        <Estado tono="peligro" icono="💥" etiqueta={`terminó la noche ${vista.noche}`} titulo={<>Perdiste <strong className="dato">{perdido}</strong></>} texto="Mañana será otro día." />
+      ) : ganado > 0 ? (
+        <Estado tono="bien" icono="🔒" etiqueta={`terminó la noche ${vista.noche}`} titulo={<>Guardaste <strong className="dato">{ganado}</strong></>} texto="Nadie sabe cuánto tenés. Que siga así." />
+      ) : (
+        <Estado tono="neutro" icono="🌙" etiqueta={`terminó la noche ${vista.noche}`} titulo="Noche en blanco" texto="No guardaste nada, pero tampoco perdiste." />
+      );
+  } else if (vista.fase === 'decidir' && yo.eleccion !== null) {
+    estado = (
+      <Estado
+        tono={yo.eleccion === 'vuelvo' ? 'calido' : 'neutro'}
+        icono="🤫"
+        etiqueta="elegiste"
+        titulo={yo.eleccion === 'sigo' ? 'Sigo' : 'Me vuelvo'}
+        texto="Cara de póker. Mirá la tele."
+      />
+    );
+  } else if (yo.lugar === 'atrapado') {
+    estado =
+      vista.perdi !== null && vista.perdi > 0 ? (
+        <Estado tono="peligro" icono="💥" etiqueta="te agarraron" titulo={<>Perdiste <strong className="dato">{vista.perdi}</strong></>} texto={`Lo que cargabas quedó en el camino. Tu baúl está a salvo.`} />
+      ) : (
+        <Estado tono="neutro" icono="😮‍💨" etiqueta="te agarraron" titulo="Susto gratis" texto="No llevabas nada encima." />
+      );
+  } else if (yo.lugar === 'campamento') {
+    estado = (
+      <Estado tono="calido" icono="🔥" etiqueta="a salvo en el campamento" titulo="Lo tuyo está guardado" texto="Ahora a mirar cómo les va a los demás." />
+    );
+  } else if (vista.fase === 'presentacion') {
+    estado = (
+      <Estado tono="neutro" icono="🌙" etiqueta={`noche ${vista.noche} de ${vista.nochesTotales}`} titulo="Todos al camino" texto="Mochila vacía. Mirá la tele." />
+    );
+  } else {
+    estado = (
+      <Estado
+        tono="neutro"
+        icono="🎒"
+        etiqueta={`noche ${vista.noche} · en el camino`}
+        titulo={vista.compania === 0 ? 'Estás solo' : 'Seguís adentro'}
+        texto={vista.compania === 0 ? 'Todo lo que salga es tuyo. Mirá la tele.' : `Con ${vista.compania} más. Mirá la tele.`}
+      />
+    );
+  }
 
   return (
-    <main className="pantalla">
-      <p className="titulo" style={{ marginBottom: 4 }}>{vista.yo.nombre}</p>
-      <p style={{ fontSize: '13px', opacity: 0.65, letterSpacing: '0.02em', textTransform: 'uppercase', marginBottom: 12 }}>Secreto: {vista.yo.objetivo}</p>
-
-      {accionActual.tipo === 'elegir_ruta' && (
-        <PantallaRuta
-          accion={accionActual as any}
-          onSiguiente={(v) => handleSiguiente('ruta', v)}
-          tramoMasDuroRevelado={vista.perroTramoRevelado}
-        />
-      )}
-      {accionActual.tipo === 'elegir_raciones' && (
-        <PantallaRaciones accion={accionActual as any} onSiguiente={(v) => handleSiguiente('raciones', v)} />
-      )}
-      {accionActual.tipo === 'bloquear' && (
-        <PantallaBloquear onSiguiente={(v) => handleSiguiente('bloquear', v)} />
-      )}
-      {accionActual.tipo === 'responder_trato' && (
-        <PantallaTrato onSiguiente={(v) => handleSiguiente('trato', v)} trato={vista.trato} />
-      )}
-      {accionActual.tipo === 'entregar_objeto' && (
-        <PantallaEntregarObjeto
-          accion={accionActual as any}
-          onEntregar={(v) => handleSiguiente('entregar_objeto', v)}
-          onOmitir={() => setPaso(paso + 1)}
-        />
-      )}
-    </main>
+    <Marco ficha={ficha} derecha={lunas}>
+      {estado}
+      <Numeros vista={vista} />
+    </Marco>
   );
 }

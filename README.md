@@ -11,7 +11,7 @@ su ruta.
 
 | Juego | Jugadores | Dura | Estado |
 |---|---|---|---|
-| [Sálvese quien pueda!](juegos/salvese/) — una caravana cruza una sierra en cinco noches | 2 a 10 | 25 min | jugable (sin voz de IA todavía) |
+| [Sálvese quien pueda!](juegos/salvese/) — cinco noches en la sierra: ¿seguís o te volvés con lo que cargás? | 3 a 10 | 15 min | jugable, falta playtest con gente |
 
 ## Estructura
 
@@ -45,8 +45,7 @@ pnpm dev          # servidor 8787 · portal 5172 · tv 5173 · control 5174
 ```
 
 Los celulares entran por la IP de la máquina en la misma red: alcanza para las
-primeras mesas y no hace falta desplegar nada. Sin `ANTHROPIC_API_KEY` los juegos
-funcionan igual, con sus textos de respaldo.
+primeras mesas y no hace falta desplegar nada.
 
 `pnpm -r typecheck` · `pnpm test` · `pnpm -r build` — o las tres seguidas con
 `pnpm verificar`. Ninguna de las dos primeras mira CSS ni assets: el `build`

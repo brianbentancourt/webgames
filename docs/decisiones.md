@@ -267,3 +267,116 @@ objetivos se estorben" y no se cumplía porque ninguno obligaba a nada.
 
 Lo que **no** cambia de D9: que el trato pueda no ofrecerse a nadie. Que "ninguno"
 sea posible es lo que hace que la sospecha salga gratis.
+
+---
+
+### D22 — La travesía se escala a la mesa; el tablero se calibra para cinco
+
+`distancia`, `recursoCritico` y el `costoRecurso` de cada tramo son los números de
+una mesa de **cinco** —el punto óptimo que declara el diseño— y el motor los
+reescala al empezar, cuando por primera vez sabe cuánta gente hay. El máximo de
+viajeros al trabajo pesado pasa a ser la mitad de la mesa, hasta tres.
+
+**El juego era imposible de ganar.** No "difícil": imposible. El avance de una
+noche es `base + esfuerzo − dureza` y el esfuerzo es por cabeza, así que el techo
+de una travesía depende del tamaño de la mesa; con una distancia fija de 24 leguas
+no se llegaba en ninguna configuración. Cero llegadas en 320 partidas simuladas con
+juego óptimo, de 2 a 10 jugadores. Toda partida terminaba en *"no llegaron a
+destino"*, y el objetivo `ver-el-final` —*"llegar, nada más que eso"*— no lo podía
+cumplir nadie.
+
+Lo mismo del otro lado: el consumo del recurso es por viajero y el stock era fijo,
+así que con cinco en la mesa la comida se acababa en la noche 3 y con seis en la 2.
+Después el hambre pega −1 de vigor a todos, todas las noches, hasta que nadie tiene
+vigor para ir al trabajo pesado: **las últimas dos noches quedaban sin ninguna
+decisión que tomar.**
+
+**Por qué escalar la distancia y no dejar que cada mesa llegue distinto.** Nadie ve
+las leguas: la TV pinta una fracción. El único número absoluto que se lee es el
+margen del epílogo, y ese ya es relativo a esa partida. Escalar no cambia nada de
+lo que la mesa percibe y hace que el tablero pueda estar calibrado.
+
+**Por qué el trabajo pesado es la mitad de la mesa.** Con un máximo fijo de 3 y la
+regla de D19 de no repetir dos noches seguidas, una mesa de 3 mandaba a los tres
+disponibles la noche 2 y la noche 3 no tenía a nadie elegible: el esfuerzo salía
+3, 0, 3, 0. Atado a la mitad, la rotación cierra todas las noches en cualquier
+cantidad de jugadores.
+
+**Descartado — que el aporte del esfuerzo sea una fracción de la caravana** para
+que el avance no dependa del tamaño de la mesa y la distancia pudiera quedar fija.
+Rompe lo único de la aritmética que un jugador puede seguir de cabeza: *uno más
+empujando es una legua más*.
+
+Los valores concretos siguen sin estar calibrados con gente. Esto los mueve de
+*imposible* a *jugable y peleado*; la calibración fina sigue pidiendo las 15–20
+partidas reales que dice `plan-diversion.md`.
+
+---
+
+### D23 — El rango de vigor se ensancha a 0–5, arrancando en 4
+
+Era 0–3 arrancando en 3.
+
+**`abundante` no hacía nada.** Con el tope en el valor inicial, pagar 3 de recurso
+por viajero en vez de 2 era estrictamente peor que `normal` mientras la mesa
+estuviera entera. La decisión de raciones tenía dos opciones reales, no tres.
+Arrancar por debajo del techo es lo que le da sentido: la primera noche se puede
+comprar colchón.
+
+Y había **tres fuentes de −1 sobre un rango de 3** —`ajustado`, el trabajo pesado y
+el hambre—, así que dos noches malas quebraban a cualquiera. Un quebrado no puede
+ir al trabajo pesado: deja de participar de la única decisión que se toma contra
+una persona. En simulación se quebraba el 100% de la mesa en el 100% de las
+partidas; con el rango ensanchado y el recurso de D22, entre el 8% y el 40%.
+
+El aspecto público (`entero`, `cansado`, `al_limite`, `quebrado`) sigue siendo de
+cuatro estados y ahora sale de umbrales, no de valores exactos: recalibrar el rango
+no obliga a tocar lo que se lee a tres metros.
+
+---
+
+### D24 — El juego pasa a ser "sigo o me vuelvo"
+
+Se tiró el motor deliberativo entero (rutas, raciones, vigor, roles, boletas,
+esfuerzo, objetos, trato, objetivos secretos, relato por LLM) y se reemplazó por
+un push-your-luck: cada noche se da vuelta un tramo por vez, la plata se reparte
+entre los que siguen en el camino, y después de cada tramo todos eligen a la vez
+en el celular si siguen o se vuelven con lo que cargan. El segundo peligro igual
+se lleva todo lo que cargan los que siguen.
+
+**Por qué.** Después de D18–D23 el juego andaba, pero aburría: tres minutos de
+deliberación sobre números abstractos, siete segundos de resultado y una resta.
+Cinco roles asimétricos para explicar antes de jugar. El playtest nunca llegó a
+la mesa porque nadie quería la segunda partida. Ninguna de las cirugías de
+`plan-diversion.md` tocaba eso: arreglaban por qué hablar no tenía consecuencias,
+no por qué no pasaba nada.
+
+**Qué se queda.** La TV como tablero (pilar del repo), el servidor de salas, la
+reconexión, el lobby con QR, la estética de papel recortado, los fondos, las
+siluetas y el perro, que ahora olfatea la próxima carta y avisa en público
+(acierta casi siempre, nunca siempre: D10 sigue en pie). El motor puro y
+determinista con efectos `agendar`/`publicar` (D4) también.
+
+**Qué cambia de los pilares.** D1 sigue y se cumple mejor: el celular se toca un
+segundo por vuelta, y la charla es bluff ("yo sigo, eh…") con revelación
+inmediata. D2 se da vuelta: ya no es cooperativo, gana el baúl más lleno. Lo que
+D2 quería —gente con prioridades distintas, sin traidor— lo da que la mochila
+sea pública y el baúl secreto.
+
+**Cómo se calibra.** `apps/servidor/src/travesia.test.ts` juega 400 partidas por
+tablero con bots que estiman el riesgo como lo haría una mesa y vigila la forma:
+a cada jugador lo agarran entre 15% y 55% de las noches, una noche dura entre 4 y
+12 tramos, ninguna estrategia gana más de la mitad de las veces y la partida
+entra en 6–20 minutos. Hoy: ~7 tramos, ~35% atrapados, ~12 minutos.
+
+**Descartado.**
+- *Chamuyo* (respuestas falsas, estilo Balderdash): la que más risa da, pero
+  necesita un banco grande de datos reales verificados. Queda como segundo juego
+  del portal.
+- *Infiltrado* (palabra secreta, estilo Spyfall): costo de contenido nulo, pero
+  pide una sola discusión larga por ronda, que es lo que acá aburría.
+- *Mantener el motor y sumarle push-your-luck*: dos juegos en uno, ninguno
+  terminado.
+
+El diseño anterior vive en el historial (`fea6b8c`) y sus docs
+(`specs/`, `plan-diversion.md`, `plan-pendientes.md`) se borraron con él.

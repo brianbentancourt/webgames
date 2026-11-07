@@ -20,6 +20,44 @@ interface FichaJuego {
   estado: 'jugable' | 'en_obra';
 }
 
+function Tarjeta({ juego }: { juego: FichaJuego }) {
+  const [conImagen, setConImagen] = useState(true);
+  const jugable = juego.estado === 'jugable';
+  return (
+    <li className="tarjeta" data-estado={juego.estado}>
+      {conImagen && (
+        <img
+          className="tarjeta-imagen"
+          src={`/${juego.id}/icon.jpg`}
+          alt=""
+          onError={() => setConImagen(false)}
+        />
+      )}
+      <div className="tarjeta-cuerpo">
+        <h2 className="tarjeta-nombre">{juego.nombre}</h2>
+        <p className="tarjeta-resumen">{juego.resumen}</p>
+        <p className="tarjeta-datos">
+          <span>👥 {juego.jugadores}</span>
+          <span>⏱ {juego.minutos} min</span>
+          {!jugable && <span>en obra</span>}
+        </p>
+        {jugable && (
+          <div className="acciones">
+            <a className="boton boton-tele" href={`/${juego.id}/`}>
+              <span className="boton-icono" aria-hidden>📺</span>
+              Abrir en la tele
+            </a>
+            <a className="boton boton-celu" href={`/${juego.id}/control/`}>
+              <span className="boton-icono" aria-hidden>📱</span>
+              Unirme desde el celu
+            </a>
+          </div>
+        )}
+      </div>
+    </li>
+  );
+}
+
 export function App() {
   const [juegos, setJuegos] = useState<FichaJuego[] | null>(null);
   const [error, setError] = useState(false);
@@ -33,46 +71,23 @@ export function App() {
 
   return (
     <main className="pantalla">
-      <header>
-        <h1 className="marca brasa">Juegos</h1>
-        <p className="al-pie">para jugar en el living, con la tele de tablero</p>
+      <header className="cabecera">
+        <h1 className="marca">Juegos</h1>
+        <p className="bajada">para jugar en el living · la tele es el tablero, los celulares son las cartas</p>
       </header>
 
-      {error && <p className="al-pie">no se pudo hablar con el servidor</p>}
-      {juegos === null && !error && <p className="al-pie">buscando juegos…</p>}
+      {error && <p className="aviso">No se pudo hablar con el servidor. Recargá en un rato.</p>}
+      {juegos === null && !error && <p className="aviso">buscando juegos…</p>}
+      {juegos?.length === 0 && <p className="aviso">Todavía no hay ninguno.</p>}
 
       <ul className="lista">
         {juegos?.map((juego) => (
-          <li key={juego.id}>
-            <div
-              className="tarjeta"
-              data-estado={juego.estado}
-            >
-              <div className="tarjeta-contenido">
-                <span className="nombre">{juego.nombre}</span>
-                <span className="resumen">{juego.resumen}</span>
-                <span className="al-pie">
-                  {juego.jugadores} · {juego.minutos} min
-                  {juego.estado === 'en_obra' && ' · en obra'}
-                </span>
-              </div>
-              {juego.estado === 'jugable' && (
-                <div className="acciones">
-                  <a className="boton-accion" href={`/${juego.id}`}>
-                    Abrir Tablero
-                  </a>
-                  <a className="boton-accion secundario" href={`/${juego.id}/control`}>
-                    Unirse (Celular)
-                  </a>
-                </div>
-              )}
-            </div>
-          </li>
+          <Tarjeta key={juego.id} juego={juego} />
         ))}
       </ul>
 
-      <footer className="al-pie">
-        {juegos?.length === 0 ? 'todavía no hay ninguno' : 'elegí uno en la tele'}
+      <footer className="pie">
+        <span>¿Primera vez?</span> Abrí el juego en la tele y escaneen el código con el celu.
       </footer>
     </main>
   );

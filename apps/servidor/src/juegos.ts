@@ -33,9 +33,9 @@ export const JUEGOS: readonly FichaJuego[] = [
   {
     id: 'salvese',
     nombre: 'Sálvese Quien Pueda',
-    resumen: 'Una caravana cruza una sierra en cinco noches. Decisiones difíciles, secretos ocultos y el desafío de sobrevivir como grupo.',
-    jugadores: '2 a 10',
-    minutos: 25,
+    resumen: 'Cinco noches en la sierra. Después de cada tramo, todos eligen a la vez: ¿seguís o te volvés con lo que cargás?',
+    jugadores: '3 a 10',
+    minutos: 15,
     estado: 'jugable',
     carpeta: 'salvese',
   },

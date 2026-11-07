@@ -1,1477 +1,431 @@
-import type { JugadorId, TableroId, TramoId, ObjetoId, ObjetivoId } from './ids.js';
-import { jugadorId, objetoId } from './ids.js';
-import type { EstadoPartida, NivelRaciones, Viajero, EstadoNoche, Boleta, EntradaCronica, Fase, Vigor, Tramo, RevelacionBoletas } from './estado.js';
-import type { Escena, PedidoRelato, ResultadoRelato } from './llm.js';
-import type { Gatillo } from './vistas.js';
-import { VIGOR_MAX, VIGOR_INICIAL, RACIONES, AVANCE, TIEMPOS, ventanaDecidirMs, hayRepartoDeEsfuerzo, PERRO_MIENTE, PERRO_EXPLORA_RIESGO, TRATO, OBJETOS_CAPACIDAD } from './config.js';
+/**
+ * La máquina de reglas. Pura y determinista: (estado, comando) → (estado, efectos).
+ *
+ * No sabe de sockets ni de relojes. Cuando una fase dura, devuelve un efecto
+ * `agendar` y el servidor le avisa con `vencio_fase` cuando se cumple el plazo.
+ * Nunca lanza: lo inválido vuelve como `Rechazo`.
+ *
+ * El loop de una noche:
+ *
+ *   presentacion → revelar ─┬─ hallazgo / primer peligro → decidir → retirada ─┐
+ *                    ▲      └─ segundo peligro igual → emboscada → fin_noche   │
+ *                    └──────────── queda alguien en el camino ─────────────────┤
+ *                                  no queda nadie → fin_noche ←────────────────┘
+ */
+
+import { PERRO, TIEMPOS } from './config.js';
+import type {
+  AvisoPerro,
+  Carta,
+  Eleccion,
+  EstadoPartida,
+  Estadisticas,
+  FinDeNoche,
+  Jugador,
+  TableroDato,
+} from './estado.js';
+import type { JugadorId } from './ids.js';
 import { crearRng } from './rng.js';
-import { REPARTO, type Rol } from './roles.js';
+
+/* ------------------------------------------------------------------ */
+/* Contrato                                                            */
+/* ------------------------------------------------------------------ */
 
 export type Comando =
-  | { t: 'crear'; tablero: TableroId; semilla: string }
-  | { t: 'sumar_jugador'; jugador: JugadorId; nombre: string }
-  | { t: 'quitar_jugador'; jugador: JugadorId }
-  | { t: 'marcar_listo'; jugador: JugadorId; listo: boolean }
-  | { t: 'empezar' }
   | {
-      t: 'elegir';
-      jugador: JugadorId;
-      ruta?: TramoId;
-      raciones?: NivelRaciones;
+      t: 'empezar';
+      tablero: TableroDato;
+      semilla: string;
+      jugadores: { id: JugadorId; nombre: string }[];
     }
-  | { t: 'bloquear'; jugador: JugadorId }
-  /**
-   * A quiénes manda al trabajo pesado esta noche (D19). Del Capataz si hay uno
-   * en la mesa; si no, cada uno solo puede mandarse a sí mismo. Independiente
-   * de `elegir`/`bloquear` a propósito: no depende de la boleta.
-   */
-  | { t: 'asignar_esfuerzo'; jugador: JugadorId; a: JugadorId[] }
-  /**
-   * El Capataz manda al perro a explorar (D10, A2). Nadie más lo controla —
-   * solo esta decisión, que es la que duele, cae en quien reparte el dolor.
-   * Disponible desde la noche 3, solo si `perro.presente`, y una sola vez por
-   * noche. Independiente del esfuerzo y de la boleta.
-   */
-  | { t: 'mandar_perro_a_explorar'; jugador: JugadorId; manda: boolean }
-  | { t: 'responder_trato'; jugador: JugadorId; acepta: boolean }
-  | { t: 'entregar_objeto'; de: JugadorId; a: JugadorId }
-  /** Vence el reloj de la fase actual. Lo dispara el servidor, no un jugador. */
   | { t: 'vencio_fase' }
-  /** Llegó (o no) el texto del modelo. La partida no espera por esto. */
-  | { t: 'relato_listo'; escena: Escena; resultado: ResultadoRelato };
+  | { t: 'elegir'; jugador: JugadorId; opcion: Eleccion }
+  /**
+   * Desde el final: otra partida con el mismo tablero. Sin `jugadores`, la
+   * misma mesa; con `jugadores`, la mesa nueva (los que llegaron tarde entran acá).
+   */
+  | { t: 'revancha'; jugador: JugadorId; jugadores?: { id: JugadorId; nombre: string }[] };
 
 export type Efecto =
-  /** Volver a llamar a `reducir` con `vencio_fase` dentro de N ms. */
+  /** Avisame con `vencio_fase` dentro de `enMs`. Reemplaza cualquier aviso anterior. */
   | { t: 'agendar'; enMs: number }
-  /** Pedirle el texto al modelo. Se dispara al empezar la animación (D6). */
-  | { t: 'pedir_relato'; pedido: PedidoRelato }
-  /**
-   * Reproyectar y mandar vistas. El servidor decide a quién.
-   *
-   * `gatillos` viaja solo en el efecto que nace de la transición que lo dispara,
-   * nunca se recalcula de `estado.fase` al proyectar. Si se derivara del estado,
-   * cualquier republicación posterior en la misma fase —un jugador que reconecta
-   * a mitad de la cutscene de resolución, por ejemplo— repetiría la animación
-   * para toda la mesa (08-cliente-tv.md § Los gatillos).
-   */
-  | { t: 'publicar'; a: 'todos' | 'tv' | { jugador: JugadorId }; gatillos?: Gatillo[] }
-  | { t: 'terminar' };
+  /** Mandá las vistas nuevas a todos. */
+  | { t: 'publicar' };
 
-export interface Transicion {
-  estado: EstadoPartida;
-  efectos: Efecto[];
+export type MotivoRechazo =
+  | 'fuera_de_fase'
+  | 'jugador_desconocido'
+  | 'no_esta_en_el_camino'
+  | 'ya_eligio'
+  | 'pocos_jugadores'
+  | 'sin_partida';
+
+export type Resultado =
+  | { ok: true; estado: EstadoPartida; efectos: Efecto[] }
+  | { ok: false; motivo: MotivoRechazo };
+
+const rechazo = (motivo: MotivoRechazo): Resultado => ({ ok: false, motivo });
+
+const listo = (estado: EstadoPartida, enMs?: number): Resultado => ({
+  ok: true,
+  estado: { ...estado, paso: estado.paso + 1 },
+  efectos: enMs === undefined ? [{ t: 'publicar' }] : [{ t: 'agendar', enMs }, { t: 'publicar' }],
+});
+
+/* ------------------------------------------------------------------ */
+/* Entrada                                                             */
+/* ------------------------------------------------------------------ */
+
+export function reducir(estado: EstadoPartida | null, comando: Comando): Resultado {
+  if (comando.t === 'empezar') {
+    if (comando.jugadores.length < 2) return rechazo('pocos_jugadores');
+    return empezarNoche(partidaNueva(comando.tablero, comando.semilla, comando.jugadores, 0), 1);
+  }
+  if (estado === null) return rechazo('sin_partida');
+
+  switch (comando.t) {
+    case 'vencio_fase':
+      return vencer(estado);
+    case 'elegir':
+      return elegir(estado, comando.jugador, comando.opcion);
+    case 'revancha': {
+      if (estado.fase !== 'final') return rechazo('fuera_de_fase');
+      if (!estado.jugadores.some((j) => j.id === comando.jugador)) return rechazo('jugador_desconocido');
+      const mesa = comando.jugadores ?? estado.jugadores.map((j) => ({ id: j.id, nombre: j.nombre }));
+      if (mesa.length < 2) return rechazo('pocos_jugadores');
+      const nueva = partidaNueva(estado.tablero, estado.semilla, mesa, estado.ronda + 1);
+      return empezarNoche({ ...nueva, paso: estado.paso }, 1);
+    }
+  }
 }
 
-/** Motivo por el que un comando no se aplica. Nunca se lanza: se devuelve. */
-export type Rechazo = { motivo: 'fuera_de_fase' | 'jugada_invalida' | 'jugador_desconocido' };
+/* ------------------------------------------------------------------ */
+/* Armado                                                              */
+/* ------------------------------------------------------------------ */
 
-export type Resultado = { ok: true; transicion: Transicion } | { ok: false } & Rechazo;
+const statsVacias = (): Estadisticas => ({
+  vecesAtrapado: 0,
+  perdidoMax: 0,
+  perdidoTotal: 0,
+  volvioSolo: 0,
+  primeroEnVolver: 0,
+  ultimoEnVolver: 0,
+});
 
-export interface TableroDato {
-  id: string;
-  nombre: string;
-  noches: number;
-  distancia: number;
-  recursoCritico: {
-    id: string;
-    nombre: string;
-    inicial: number;
-    capacidad: number;
+function partidaNueva(
+  tablero: TableroDato,
+  semilla: string,
+  jugadores: { id: JugadorId; nombre: string }[],
+  ronda: number,
+): EstadoPartida {
+  return {
+    tablero,
+    semilla,
+    ronda,
+    noche: 0,
+    fase: 'presentacion',
+    paso: 0,
+    jugadores: jugadores.map(
+      (j): Jugador => ({
+        id: j.id,
+        nombre: j.nombre,
+        baul: 0,
+        mochila: 0,
+        lugar: 'camino',
+        eleccion: null,
+        ganadoNoche: 0,
+        perdidoNoche: 0,
+        stats: statsVacias(),
+      }),
+    ),
+    mazo: [],
+    camino: [],
+    quitados: {},
+    perro: null,
+    retirada: null,
+    emboscada: null,
+    historial: [],
   };
-  tramos: {
-    id: TramoId;
-    nombre: string;
-    dureza: number;
-    costoRecurso: number;
-    hallazgo: number;
-    pista: string;
-    terreno: string;
-  }[];
-  mazoObjetos: {
-    id: string;
-    nombre: string;
-    clase: 'redistribuye' | 'no_identificado' | 'pesa' | 'dano_diferido' | 'de_bolsillo';
-    efecto: string;
-    usos: number;
-  }[];
-  objetivos: {
-    id: string;
-    texto: string;
-    condicion: string;
-  }[];
-  vozDelCamino: string;
-  fondos: string[];
-  respaldos: Record<string, string[]>;
 }
 
-const tablerosRegistry = new Map<string, TableroDato>();
-
-export function registrarTablero(id: string, tablero: TableroDato) {
-  tablerosRegistry.set(id, tablero);
-}
-
-export function obtenerTablero(id: string): TableroDato {
-  const t = tablerosRegistry.get(id);
-  if (!t) {
-    throw new Error(`Tablero con ID ${id} no registrado en el core`);
+/** Todos los hallazgos más las copias de peligro que siguen en juego, barajados. */
+export function armarMazo(estado: EstadoPartida, noche: number): Carta[] {
+  const { tablero } = estado;
+  const cartas: Carta[] = tablero.hallazgos.map((h, i) => ({
+    id: `h${i}`,
+    t: 'hallazgo',
+    valor: h.valor,
+    nombre: h.nombre,
+  }));
+  for (const p of tablero.peligros) {
+    const copias = tablero.copiasPorPeligro - (estado.quitados[p.tipo] ?? 0);
+    for (let k = 0; k < copias; k++) cartas.push({ id: `${p.tipo}-${k}`, t: 'peligro', tipo: p.tipo });
   }
-  return t;
+  return crearRng(`${estado.semilla}:${estado.ronda}:mazo:${noche}`).barajar(cartas);
 }
 
-export function reducir(estado: EstadoPartida, comando: Comando): Resultado {
-  const ahora = Date.now();
+function empezarNoche(estado: EstadoPartida, noche: number): Resultado {
+  return listo(
+    {
+      ...estado,
+      noche,
+      fase: 'presentacion',
+      mazo: armarMazo(estado, noche),
+      camino: [],
+      perro: null,
+      retirada: null,
+      emboscada: null,
+      jugadores: estado.jugadores.map((j) => ({
+        ...j,
+        mochila: 0,
+        lugar: 'camino',
+        eleccion: null,
+        ganadoNoche: 0,
+        perdidoNoche: 0,
+      })),
+    },
+    TIEMPOS.presentacionMs,
+  );
+}
 
-  if (comando.t === 'crear') {
-    const tablero = obtenerTablero(comando.tablero);
-    const nuevoEstado: EstadoPartida = {
-      id: estado.id,
-      tablero: comando.tablero,
-      semilla: comando.semilla,
-      fase: 'lobby',
-      noche: 0,
-      nochesTotales: tablero.noches,
-      avance: 0,
-      distanciaTotal: tablero.distancia,
-      recurso: tablero.recursoCritico.inicial,
-      capacidad: tablero.recursoCritico.capacidad,
-      viajeros: [],
-      perro: { presente: true, alerta: 'ninguna', dice_la_verdad: true },
-      objetos: [],
-      cronica: [],
-      esfuerzoNocheAnterior: [],
-    };
-    return {
-      ok: true,
-      transicion: {
-        estado: nuevoEstado,
-        efectos: [{ t: 'publicar', a: 'todos' }],
+/* ------------------------------------------------------------------ */
+/* Reloj                                                               */
+/* ------------------------------------------------------------------ */
+
+function vencer(estado: EstadoPartida): Resultado {
+  switch (estado.fase) {
+    case 'presentacion':
+      return revelar(estado);
+    case 'revelar':
+      return abrirDecision(estado);
+    case 'decidir':
+      return cerrarDecision(estado);
+    case 'retirada':
+      return enCamino(estado).length === 0 ? terminarNoche(estado, 'todos_volvieron') : revelar(estado);
+    case 'emboscada':
+      return terminarNoche(estado, 'emboscada');
+    case 'fin_noche':
+      return estado.noche < estado.tablero.noches
+        ? empezarNoche(estado, estado.noche + 1)
+        : listo({ ...estado, fase: 'final' });
+    case 'final':
+      return rechazo('fuera_de_fase');
+  }
+}
+
+const enCamino = (estado: EstadoPartida) => estado.jugadores.filter((j) => j.lugar === 'camino');
+
+/* ------------------------------------------------------------------ */
+/* Dar vuelta un tramo                                                 */
+/* ------------------------------------------------------------------ */
+
+function revelar(estado: EstadoPartida): Resultado {
+  const [carta, ...mazo] = estado.mazo;
+  // Con 15 hallazgos y a lo sumo dos peligros por tipo antes de la emboscada,
+  // quedarse sin cartas es casi imposible. Si pasa, los que siguen vuelven
+  // enteros: el camino se terminó antes que ellos.
+  if (carta === undefined) return terminarNoche(bancarATodos(estado), 'sin_cartas');
+
+  const presentes = enCamino(estado);
+
+  if (carta.t === 'hallazgo') {
+    const cadaUno = Math.floor(carta.valor / presentes.length);
+    const resto = carta.valor % presentes.length;
+    return listo(
+      {
+        ...estado,
+        fase: 'revelar',
+        mazo,
+        perro: null,
+        retirada: null,
+        camino: [...estado.camino, { carta, resto }],
+        jugadores: estado.jugadores.map((j) =>
+          j.lugar === 'camino' ? { ...j, mochila: j.mochila + cadaUno } : j,
+        ),
       },
-    };
+      TIEMPOS.hallazgoMs,
+    );
   }
 
-  // Comandos de lobby
-  if (estado.fase === 'lobby') {
-    if (comando.t === 'sumar_jugador') {
-      if (estado.viajeros.some((v) => v.id === comando.jugador)) {
-        return { ok: false, motivo: 'jugada_invalida' };
-      }
-      if (estado.viajeros.length >= 10) {
-        return { ok: false, motivo: 'jugada_invalida' };
-      }
-      const nuevoViajero: Viajero = {
-        id: comando.jugador,
-        nombre: comando.nombre,
-        rol: 'pasajero',
-        asiento: estado.viajeros.length,
-        vigor: VIGOR_INICIAL as Vigor,
-        objetivo: '' as ObjetivoId,
-        conectado: true,
-        cegado: false,
-        aceptoElTrato: false,
-      };
-      const nuevosViajeros = [...estado.viajeros, nuevoViajero];
-      return {
-        ok: true,
-        transicion: {
-          estado: { ...estado, viajeros: nuevosViajeros },
-          efectos: [{ t: 'publicar', a: 'todos' }],
-        },
-      };
-    }
+  const repetido = estado.camino.some((c) => c.carta.t === 'peligro' && c.carta.tipo === carta.tipo);
+  const camino = [...estado.camino, { carta, resto: 0 }];
 
-    if (comando.t === 'quitar_jugador') {
-      if (!estado.viajeros.some((v) => v.id === comando.jugador)) {
-        return { ok: false, motivo: 'jugador_desconocido' };
-      }
-      const nuevosViajeros = estado.viajeros.filter((v) => v.id !== comando.jugador);
-      // Reasignar asientos
-      nuevosViajeros.forEach((v, i) => {
-        v.asiento = i;
-      });
-      return {
-        ok: true,
-        transicion: {
-          estado: { ...estado, viajeros: nuevosViajeros },
-          efectos: [{ t: 'publicar', a: 'todos' }],
-        },
-      };
-    }
+  if (!repetido) {
+    return listo({ ...estado, fase: 'revelar', mazo, camino, perro: null, retirada: null }, TIEMPOS.sustoMs);
+  }
 
-    if (comando.t === 'marcar_listo') {
-      const viajero = estado.viajeros.find((v) => v.id === comando.jugador);
-      if (!viajero) return { ok: false, motivo: 'jugador_desconocido' };
-      const nuevosViajeros = estado.viajeros.map((v) =>
-        v.id === comando.jugador ? { ...v, listo: comando.listo } : v,
-      );
-      return {
-        ok: true,
-        transicion: {
-          estado: { ...estado, viajeros: nuevosViajeros },
-          efectos: [{ t: 'publicar', a: 'todos' }],
-        },
-      };
-    }
-
-    if (comando.t === 'empezar') {
-      const n = estado.viajeros.length;
-      if (n < 2 || n > 10) return { ok: false, motivo: 'jugada_invalida' };
-
-      const todosListos = estado.viajeros.every((v) => v.listo === true);
-      if (!todosListos) return { ok: false, motivo: 'jugada_invalida' };
-
-      const rng = crearRng(estado.semilla);
-      const rolesDisponibles = REPARTO[n]!;
-      const rolesBarajados = rng.barajar(rolesDisponibles);
-
-      const tablero = obtenerTablero(estado.tablero);
-      const objetivosBarajados = rng.barajar(tablero.objetivos);
-
-      const nuevosViajeros = estado.viajeros.map((v, i) => {
-        const rol = rolesBarajados[i]!;
-        const objetivo = objetivosBarajados[i]!.id as ObjetivoId;
+  // Emboscada: los que siguen en el camino pierden lo que cargan, y una copia
+  // de ese peligro sale del juego (lo que ya pasó no vuelve a pasar igual).
+  const perdieron = presentes.map((j) => ({ jugador: j.id, cuanto: j.mochila }));
+  return listo(
+    {
+      ...estado,
+      fase: 'emboscada',
+      mazo,
+      camino,
+      perro: null,
+      retirada: null,
+      emboscada: { tipo: carta.tipo, perdieron },
+      quitados: { ...estado.quitados, [carta.tipo]: (estado.quitados[carta.tipo] ?? 0) + 1 },
+      jugadores: estado.jugadores.map((j) => {
+        if (j.lugar !== 'camino') return j;
         return {
-          ...v,
-          rol,
-          objetivo,
-          vigor: VIGOR_INICIAL as Vigor,
-          asiento: i,
-          conectado: true,
-          cegado: false,
-          aceptoElTrato: false,
-        };
-      });
-
-      // Configurar parejas
-      for (const v1 of nuevosViajeros) {
-        const v2 = nuevosViajeros.find((x) => x.id !== v1.id && x.rol === v1.rol);
-        if (v2) {
-          v1.parejaDe = v2.id;
-        }
-      }
-
-      // El trato (D9, C3): se decide una sola vez para toda la travesía, acá
-      // — no una probabilidad creciente noche a noche. Una tirada decide si
-      // esta travesía no lo ofrece a nadie; si lo ofrece, la noche sale
-      // sorteada dentro de la ventana de `TRATO`. A quién se le ofrece esa
-      // noche se resuelve más tarde, en la transición fogón → acampar, porque
-      // depende de cómo viene la partida en ese momento.
-      const noSeOfrece = rng.suerte(TRATO.probabilidadDeNoOfrecer);
-      const nocheTrato = noSeOfrece ? undefined : rng.entero(TRATO.nocheMin, TRATO.nocheMax);
-
-      const estadoSiguiente: EstadoPartida = {
-        ...estado,
-        fase: 'reparto',
-        viajeros: nuevosViajeros,
-        ...(nocheTrato !== undefined ? { nocheTrato } : {}),
-      };
-
-      return {
-        ok: true,
-        transicion: {
-          estado: estadoSiguiente,
-          efectos: [
-            { t: 'agendar', enMs: TIEMPOS.repartoMs },
-            { t: 'publicar', a: 'todos' },
-          ],
-        },
-      };
-    }
-
-    return { ok: false, motivo: 'fuera_de_fase' };
-  }
-
-  // reparto -> acampar
-  if (estado.fase === 'reparto') {
-    if (comando.t === 'vencio_fase') {
-      const rng = crearRng(estado.semilla + '-noche-1');
-      const tablero = obtenerTablero(estado.tablero);
-      const tramosBarajados = rng.barajar(tablero.tramos);
-      const candidatos = tramosBarajados.slice(0, 2) as any as Tramo[];
-
-      // Calcular alerta del perro para la noche 1
-      const durezaMax = Math.max(...candidatos.map((c) => c.dureza));
-      const alertas: ('ninguna' | 'inquieto' | 'grune' | 'no_avanza')[] = [
-        'ninguna',
-        'inquieto',
-        'grune',
-        'no_avanza',
-      ];
-      const alertaCorrecta = alertas[durezaMax]!;
-      let alerta = alertaCorrecta;
-      let diceVerdad = true;
-      if (rng.suerte(PERRO_MIENTE)) {
-        const alternativas = alertas.filter((a) => a !== alertaCorrecta);
-        alerta = rng.elegir(alternativas);
-        diceVerdad = false;
-      }
-
-      const nocheActual: EstadoNoche = {
-        numero: 1,
-        candidatos,
-        boletas: {},
-        venceEn: ahora + TIEMPOS.acamparMs,
-      };
-
-      const nuevoEstado: EstadoPartida = {
-        ...estado,
-        fase: 'acampar',
-        noche: 1,
-        nocheActual,
-        perro: { presente: true, alerta, dice_la_verdad: diceVerdad },
-      };
-
-      // El perro avisa: se para, mira, gruñe. Una noche tranquila no anima nada.
-      const gatillosPerro: Gatillo[] =
-        alerta !== 'ninguna' ? [{ tipo: 'alerta', que: 'perro', duracionMs: TIEMPOS.alertaMs }] : [];
-
-      return {
-        ok: true,
-        transicion: {
-          estado: nuevoEstado,
-          efectos: [
-            { t: 'agendar', enMs: TIEMPOS.acamparMs },
-            { t: 'publicar', a: 'todos', gatillos: gatillosPerro },
-          ],
-        },
-      };
-    }
-    return { ok: false, motivo: 'fuera_de_fase' };
-  }
-
-  // acampar -> decidir
-  if (estado.fase === 'acampar') {
-    if (comando.t === 'responder_trato' && comando.jugador === estado.tratoOfrecidoA) {
-      const viajeros = estado.viajeros.map((v) =>
-        v.id === comando.jugador ? { ...v, aceptoElTrato: comando.acepta } : v
-      );
-      return {
-        ok: true,
-        transicion: {
-          estado: { ...estado, viajeros },
-          efectos: [{ t: 'publicar', a: 'todos' }],
-        },
-      };
-    }
-
-    if (comando.t === 'entregar_objeto') {
-      const de = estado.viajeros.find((v) => v.id === comando.de);
-      const a = estado.viajeros.find((v) => v.id === comando.a);
-      if (!de || !a || !de.objeto || a.objeto) {
-        return { ok: false, motivo: 'jugada_invalida' };
-      }
-      const objId = de.objeto;
-      const viajeros = estado.viajeros.map((v) => {
-        if (v.id === de.id) {
-          const { objeto, ...vSinObjeto } = v;
-          return vSinObjeto as Viajero;
-        }
-        if (v.id === a.id) return { ...v, objeto: objId };
-        return v;
-      });
-      const objetos = estado.objetos.map((o) =>
-        o.id === objId ? { ...o, portador: a.id } : o
-      );
-      return {
-        ok: true,
-        transicion: {
-          estado: { ...estado, viajeros, objetos },
-          efectos: [{ t: 'publicar', a: 'todos' }],
-        },
-      };
-    }
-
-    if (comando.t === 'vencio_fase') {
-      const ventana = ventanaDecidirMs(estado.noche);
-      const nocheActual = {
-        ...estado.nocheActual!,
-        venceEn: ahora + ventana,
-      };
-      return {
-        ok: true,
-        transicion: {
-          estado: { ...estado, fase: 'decidir', nocheActual },
-          efectos: [
-            { t: 'agendar', enMs: ventana },
-            { t: 'publicar', a: 'todos' },
-          ],
-        },
-      };
-    }
-    return { ok: false, motivo: 'fuera_de_fase' };
-  }
-
-  // decidir -> resolver
-  if (estado.fase === 'decidir') {
-    if (comando.t === 'responder_trato' && comando.jugador === estado.tratoOfrecidoA) {
-      const viajeros = estado.viajeros.map((v) =>
-        v.id === comando.jugador ? { ...v, aceptoElTrato: comando.acepta } : v
-      );
-      return {
-        ok: true,
-        transicion: {
-          estado: { ...estado, viajeros },
-          efectos: [{ t: 'publicar', a: 'todos' }],
-        },
-      };
-    }
-
-    if (comando.t === 'elegir') {
-      const boletaExistente = estado.nocheActual?.boletas[comando.jugador];
-      if (boletaExistente && boletaExistente.bloqueadaEn > 0) {
-        return { ok: false, motivo: 'jugada_invalida' };
-      }
-      const candidatos = estado.nocheActual!.candidatos;
-      const ruta = comando.ruta ?? boletaExistente?.ruta ?? candidatos[0]!.id;
-      const raciones = comando.raciones ?? boletaExistente?.raciones ?? 'normal';
-
-      const boleta: Boleta = {
-        ruta,
-        raciones,
-        bloqueadaEn: 0,
-      };
-
-      const boletas = {
-        ...estado.nocheActual!.boletas,
-        [comando.jugador]: boleta,
-      };
-
-      const nocheActual = {
-        ...estado.nocheActual!,
-        boletas,
-      };
-
-      return {
-        ok: true,
-        transicion: {
-          estado: { ...estado, nocheActual },
-          efectos: [{ t: 'publicar', a: { jugador: comando.jugador } }],
-        },
-      };
-    }
-
-    if (comando.t === 'asignar_esfuerzo') {
-      const nocheActual = estado.nocheActual;
-      if (!nocheActual) return { ok: false, motivo: 'fuera_de_fase' };
-
-      // En la noche 1 no se reparte (D8): el celular no ofrece la acción, así
-      // que tampoco se acepta el comando. Si se aceptara, el estado tendría un
-      // reparto que ninguna pantalla mostró.
-      if (!hayRepartoDeEsfuerzo(estado.noche)) return { ok: false, motivo: 'fuera_de_fase' };
-
-      const capataz = estado.viajeros.find((v) => v.rol === 'capataz');
-      const hayCapataz = capataz !== undefined;
-
-      // Con Capataz en la mesa, solo él reparte. Sin Capataz, el esfuerzo es
-      // voluntario: cada uno solo puede mandarse a sí mismo (D19).
-      if (hayCapataz) {
-        if (comando.jugador !== capataz.id) return { ok: false, motivo: 'jugada_invalida' };
-      } else {
-        if (comando.a.some((id) => id !== comando.jugador)) {
-          return { ok: false, motivo: 'jugada_invalida' };
-        }
-      }
-
-      if (comando.a.length > AVANCE.esfuerzoMax) return { ok: false, motivo: 'jugada_invalida' };
-      if (new Set(comando.a).size !== comando.a.length) return { ok: false, motivo: 'jugada_invalida' };
-      if (!comando.a.every((id) => estado.viajeros.some((v) => v.id === id))) {
-        return { ok: false, motivo: 'jugada_invalida' };
-      }
-      if (comando.a.some((id) => estado.viajeros.find((v) => v.id === id)?.vigor === 0)) {
-        return { ok: false, motivo: 'jugada_invalida' };
-      }
-      if (comando.a.some((id) => estado.esfuerzoNocheAnterior.includes(id))) {
-        return { ok: false, motivo: 'jugada_invalida' };
-      }
-
-      let nuevaLista: JugadorId[];
-      if (hayCapataz) {
-        // El Capataz manda la lista entera: reemplaza lo que hubiera.
-        nuevaLista = comando.a;
-      } else {
-        // Voluntario: cada uno declara solo su propia participación; hay que
-        // mezclarla con lo que ya declararon los demás, no pisarlo.
-        const actual = nocheActual.esfuerzoAsignado ?? [];
-        const sinEste = actual.filter((id) => id !== comando.jugador);
-        nuevaLista = comando.a.includes(comando.jugador) ? [...sinEste, comando.jugador] : sinEste;
-        if (nuevaLista.length > AVANCE.esfuerzoMax) return { ok: false, motivo: 'jugada_invalida' };
-      }
-
-      const respondieronPrevio = nocheActual.esfuerzoRespondieron ?? [];
-      const nuevaNocheActual: EstadoNoche = {
-        ...nocheActual,
-        esfuerzoAsignado: nuevaLista,
-        esfuerzoRespondieron: respondieronPrevio.includes(comando.jugador)
-          ? respondieronPrevio
-          : [...respondieronPrevio, comando.jugador],
-      };
-      const nuevoEstado = { ...estado, nocheActual: nuevaNocheActual };
-
-      // Si el Capataz reparte último —todos los demás ya habían bloqueado su
-      // boleta esperando justo esto— hay que resolver ahora: `bloquear` ya no
-      // va a volver a ejecutarse para disparar el atajo.
-      if (hayCapataz) {
-        const boletasActuales = nuevoEstado.nocheActual?.boletas as Record<JugadorId, Boleta> | undefined;
-        const todosBloquearon = nuevoEstado.viajeros.every(
-          (v) => (boletasActuales?.[v.id]?.bloqueadaEn ?? 0) > 0
-        );
-        if (todosBloquearon) {
-          return resolverNoche(nuevoEstado, ahora, false);
-        }
-      }
-
-      return {
-        ok: true,
-        transicion: {
-          estado: nuevoEstado,
-          efectos: [{ t: 'publicar', a: { jugador: comando.jugador } }],
-        },
-      };
-    }
-
-    if (comando.t === 'mandar_perro_a_explorar') {
-      const nocheActual = estado.nocheActual;
-      if (!nocheActual) return { ok: false, motivo: 'fuera_de_fase' };
-
-      // Manda el Capataz. Sin Capataz en la mesa (2 y 3 jugadores) esta
-      // acción no existe: D10 dice "nadie lo controla", y acá se toma la
-      // decisión que más duele, así que cae en quien reparte el dolor, no en
-      // un modo voluntario inventado.
-      const capataz = estado.viajeros.find((v) => v.rol === 'capataz');
-      if (!capataz || comando.jugador !== capataz.id) {
-        return { ok: false, motivo: 'jugada_invalida' };
-      }
-      if (estado.noche < 3) return { ok: false, motivo: 'jugada_invalida' };
-      if (!estado.perro.presente) return { ok: false, motivo: 'jugada_invalida' };
-      // Una sola respuesta por noche, diga que sí o que no: cambiar de idea
-      // después de haberlo mandado sería poder retirarlo del riesgo.
-      if (nocheActual.perroDecidido) return { ok: false, motivo: 'jugada_invalida' };
-
-      // "Que se quede" se registra igual que "mandalo". Sin este registro el
-      // servidor no distingue el "no" del silencio, y el celular tiene que
-      // acordarse solo (D4, ver `EstadoNoche.perroDecidido`).
-      const nuevaNocheActual: EstadoNoche = {
-        ...nocheActual,
-        perroDecidido: true,
-        ...(comando.manda ? { perroExplorando: true } : {}),
-      };
-      return {
-        ok: true,
-        transicion: {
-          estado: { ...estado, nocheActual: nuevaNocheActual },
-          // Que el perro salga a explorar es dato público en vivo (D10), así
-          // que va a toda la mesa. Que se quede no cambia nada visible, pero
-          // se publica igual para que el Capataz reciba su vista actualizada.
-          efectos: [{ t: 'publicar', a: 'todos' }],
-        },
-      };
-    }
-
-    if (comando.t === 'bloquear') {
-      const boleta = estado.nocheActual?.boletas[comando.jugador];
-      const candidatos = estado.nocheActual!.candidatos;
-      const nuevaBoleta: Boleta = {
-        ruta: boleta?.ruta ?? candidatos[0]!.id,
-        raciones: boleta?.raciones ?? 'normal',
-        bloqueadaEn: ahora,
-      };
-
-      const boletas = {
-        ...estado.nocheActual!.boletas,
-        [comando.jugador]: nuevaBoleta,
-      };
-
-      const nocheActual = {
-        ...estado.nocheActual!,
-        boletas,
-      };
-
-      const nuevoEstado = { ...estado, nocheActual };
-
-      // Si todos bloquearon, resolver inmediatamente — pero sin robarle la
-      // ventana al Capataz: si hay uno en la mesa y todavía no repartió el
-      // esfuerzo, se espera. Sin Capataz (esfuerzo voluntario) alcanza con que
-      // todos hayan bloqueado la boleta.
-      //
-      // La noche 1 es la excepción y hay que respetarla acá: no se reparte
-      // esfuerzo (D8), así que el Capataz nunca va a mandar `asignar_esfuerzo`
-      // y esperarlo sería esperar para siempre — la mesa bloquea en veinte
-      // segundos y se queda mirando el teléfono hasta que vence la ventana.
-      const boletasActuales = nuevoEstado.nocheActual?.boletas as Record<JugadorId, Boleta> | undefined;
-      const todosBloquearon = nuevoEstado.viajeros.every(
-        (v) => (boletasActuales?.[v.id]?.bloqueadaEn ?? 0) > 0
-      );
-      const capatazEnMesa = nuevoEstado.viajeros.find((v) => v.rol === 'capataz');
-      const capatazYaReparto = (
-        nuevoEstado.nocheActual?.esfuerzoRespondieron ?? []
-      ).includes(capatazEnMesa?.id as JugadorId);
-      const seEsperaAlCapataz =
-        capatazEnMesa !== undefined &&
-        hayRepartoDeEsfuerzo(nuevoEstado.noche) &&
-        !capatazYaReparto;
-
-      if (todosBloquearon && !seEsperaAlCapataz) {
-        return resolverNoche(nuevoEstado, ahora, false);
-      }
-
-      return {
-        ok: true,
-        transicion: {
-          estado: nuevoEstado,
-          efectos: [{ t: 'publicar', a: 'todos' }],
-        },
-      };
-    }
-
-    if (comando.t === 'vencio_fase') {
-      return resolverNoche(estado, ahora, true);
-    }
-
-    return { ok: false, motivo: 'fuera_de_fase' };
-  }
-
-  // resolver -> fogon o epilogo
-  if (estado.fase === 'resolver') {
-    // El relato reemplaza el texto de respaldo si llega a tiempo, pero NO
-    // adelanta la fase. Los 7 segundos de `resolver` son un piso, no un techo
-    // (D6): sin API key el modelo "responde" en el mismo tick, y si eso
-    // avanzara la fase, la cutscene se saltearía casi entera cada vez que se
-    // juega sin LLM configurado — que es el modo que el juego promete
-    // sostener entero. Solo `vencio_fase` cierra la noche.
-    if (comando.t === 'relato_listo') {
-      if (estado.cronica.length === 0) return { ok: false, motivo: 'jugada_invalida' };
-      const cronica = [...estado.cronica];
-      const ultIndex = cronica.length - 1;
-      const ult = cronica[ultIndex]!;
-      cronica[ultIndex] = {
-        ...ult,
-        relato: comando.resultado.texto,
-        origen: comando.resultado.origen,
-      };
-      return {
-        ok: true,
-        transicion: {
-          estado: { ...estado, cronica },
-          efectos: [{ t: 'publicar', a: 'tv' }],
-        },
-      };
-    }
-
-    if (comando.t === 'vencio_fase') {
-      const cronica = estado.cronica;
-
-      // Evaluar si terminó la partida
-      const tablero = obtenerTablero(estado.tablero);
-      const terminada =
-        estado.avance >= estado.distanciaTotal ||
-        estado.noche >= estado.nochesTotales ||
-        (estado.recurso === 0 && estado.viajeros.every((v) => v.vigor === 0));
-
-      if (terminada) {
-        // Ir a epílogo
-        const llegaron = estado.avance >= estado.distanciaTotal;
-        const objetivosCumplidos: JugadorId[] = [];
-
-        // Evaluar objetivos secretos
-        for (const v of estado.viajeros) {
-          const obj = tablero.objetivos.find((o) => o.id === v.objetivo);
-          if (obj) {
-            let cumplido = false;
-            switch (obj.id) {
-              case 'llegar-entero':
-                // Check if current vigor > 0
-                cumplido = v.vigor > 0;
-                break;
-              case 'que-nadie-quede':
-                cumplido = estado.viajeros.every((x) => x.vigor > 0);
-                break;
-              case 'sobre-raciones':
-                // Objetivo de La Sierra. El equivalente de El Salitral es
-                // 'agua-de-sobra', más abajo: son tableros distintos con ids
-                // de objetivo distintos, aunque midan lo mismo.
-                cumplido = estado.recurso >= 5;
-                break;
-              case 'agua-de-sobra':
-                cumplido = estado.recurso >= 6;
-                break;
-              case 'el-perro-llega':
-                cumplido = estado.perro.presente;
-                break;
-              case 'mano-propia': {
-                // Contar cuántas veces estuvo en esfuerzo leyendo la crónica
-                const miNombre = v.nombre;
-                const recuentos: Record<string, number> = {};
-                estado.viajeros.forEach((x) => {
-                  recuentos[x.nombre] = 0;
-                });
-                for (const entry of estado.cronica) {
-                  const esfuerzoFact = entry.hechos.find((h) => h.startsWith('esfuerzo:'));
-                  if (esfuerzoFact) {
-                    const nombres = esfuerzoFact.substring(9).split(',').map((x) => x.trim());
-                    nombres.forEach((nombre) => {
-                      if (nombre in recuentos) {
-                        recuentos[nombre] = (recuentos[nombre] || 0) + 1;
-                      }
-                    });
-                  }
-                }
-                const misNoches = recuentos[miNombre] || 0;
-                const maxOtros = Math.max(
-                  ...estado.viajeros
-                    .filter((x) => x.id !== v.id)
-                    .map((x) => recuentos[x.nombre] || 0)
-                );
-                cumplido = misNoches > maxOtros;
-                break;
-              }
-              case 'nunca-el-atajo': {
-                // Chequear si se eligió tramo de dureza alta o atajo
-                let atajoElegido = false;
-                for (const entry of estado.cronica) {
-                  const tramoFact = entry.hechos.find((h) => h.startsWith('tramo:'));
-                  if (tramoFact) {
-                    const trName = tramoFact.substring(6);
-                    const trObj = tablero.tramos.find((x) => x.nombre === trName);
-                    if (trObj && trObj.costoRecurso >= 2) {
-                      atajoElegido = true;
-                    }
-                  }
-                }
-                cumplido = !atajoElegido;
-                break;
-              }
-              case 'ver-el-final':
-                cumplido = llegaron;
-                break;
-              case 'nunca-la-aguada': {
-                // Objetivo de El Salitral: que no haya hecho falta desviarse
-                // a reponer agua. Un tramo con costoRecurso negativo repone.
-                let sedesvio = false;
-                for (const entry of estado.cronica) {
-                  const tramoFact = entry.hechos.find((h) => h.startsWith('tramo:'));
-                  if (tramoFact) {
-                    const trName = tramoFact.substring(6);
-                    const trObj = tablero.tramos.find((x) => x.nombre === trName);
-                    if (trObj && trObj.costoRecurso < 0) {
-                      sedesvio = true;
-                    }
-                  }
-                }
-                cumplido = !sedesvio;
-                break;
-              }
-              case 'cruzar-la-sal': {
-                // Objetivo de El Salitral: haber tomado el tramo de la lengua
-                // de sal al menos una vez en Sálvese quien pueda!.
-                const tramoDeSal = tablero.tramos.find((x) => x.id === 'la-lengua-de-sal');
-                cumplido = tramoDeSal
-                  ? estado.cronica.some((entry) =>
-                      entry.hechos.some((h) => h === `tramo:${tramoDeSal.nombre}`),
-                    )
-                  : false;
-                break;
-              }
-              case 'sin-carga': {
-                // Nunca portador de objeto
-                let cargoObjeto = false;
-                for (const entry of estado.cronica) {
-                  const objFact = entry.hechos.find((h) => h.includes(`portador:${v.nombre}`));
-                  if (objFact) {
-                    cargoObjeto = true;
-                  }
-                }
-                cumplido = !cargoObjeto;
-                break;
-              }
-              default:
-                cumplido = llegaron;
-            }
-            if (cumplido) objetivosCumplidos.push(v.id);
-          }
-        }
-
-        const desenlace = {
-          llegaron,
-          objetivosCumplidos,
-          perroLlego: estado.perro.presente,
-        };
-
-        const { nocheActual, ...estadoSinNocheActual } = estado;
-
-        return {
-          ok: true,
-          transicion: {
-            estado: { ...estadoSinNocheActual, fase: 'epilogo', cronica, desenlace } as any,
-            efectos: [{ t: 'publicar', a: 'todos' }],
+          ...j,
+          lugar: 'atrapado',
+          perdidoNoche: j.mochila,
+          mochila: 0,
+          stats: {
+            ...j.stats,
+            vecesAtrapado: j.stats.vecesAtrapado + 1,
+            perdidoTotal: j.stats.perdidoTotal + j.mochila,
+            perdidoMax: Math.max(j.stats.perdidoMax, j.mochila),
           },
         };
-      }
-
-      // Ir a fogón
-      return {
-        ok: true,
-        transicion: {
-          estado: { ...estado, fase: 'fogon', cronica },
-          efectos: [
-            { t: 'agendar', enMs: TIEMPOS.fogonMs },
-            { t: 'publicar', a: 'todos' },
-          ],
-        },
-      };
-    }
-    return { ok: false, motivo: 'fuera_de_fase' };
-  }
-
-  // fogon -> acampar o epilogo
-  if (estado.fase === 'fogon') {
-    if (comando.t === 'entregar_objeto') {
-      const de = estado.viajeros.find((v) => v.id === comando.de);
-      const a = estado.viajeros.find((v) => v.id === comando.a);
-      if (!de || !a || !de.objeto || a.objeto) {
-        return { ok: false, motivo: 'jugada_invalida' };
-      }
-      const objId = de.objeto;
-      const viajeros = estado.viajeros.map((v) => {
-        if (v.id === de.id) {
-          const { objeto, ...vSinObjeto } = v;
-          return vSinObjeto as Viajero;
-        }
-        if (v.id === a.id) return { ...v, objeto: objId };
-        return v;
-      });
-      const objetos = estado.objetos.map((o) =>
-        o.id === objId ? { ...o, portador: a.id } : o
-      );
-      return {
-        ok: true,
-        transicion: {
-          estado: { ...estado, viajeros, objetos },
-          efectos: [{ t: 'publicar', a: 'todos' }],
-        },
-      };
-    }
-
-    // Solo `vencio_fase`: hoy nada pide relato para la escena `fogon`, así que
-    // `relato_listo` nunca llega acá. Si en el futuro se agrega ese pedido
-    // (07-capa-llm.md § Dónde aparece), que actualice la crónica sin adelantar
-    // la fase — mismo motivo que en `resolver` más arriba — y no que reviva
-    // este patrón.
-    if (comando.t === 'vencio_fase') {
-      // Avanzar noche
-      const siguienteNoche = estado.noche + 1;
-      const rng = crearRng(estado.semilla + '-noche-' + siguienteNoche);
-      const tablero = obtenerTablero(estado.tablero);
-
-      // Elegir candidatos
-      const count = siguienteNoche === 1 ? 2 : 3;
-      const tramosBarajados = rng.barajar(tablero.tramos);
-      const candidatos = tramosBarajados.slice(0, count) as any as Tramo[];
-
-      // Calcular alerta del perro para la noche siguiente
-      const durezaMax = Math.max(...candidatos.map((c) => c.dureza));
-      const alertas: ('ninguna' | 'inquieto' | 'grune' | 'no_avanza')[] = [
-        'ninguna',
-        'inquieto',
-        'grune',
-        'no_avanza',
-      ];
-      const alertaCorrecta = alertas[durezaMax]!;
-      let alerta = alertaCorrecta;
-      let diceVerdad = true;
-
-      // Si el perro exploró anoche y volvió (A2, D10), la alerta de esta
-      // noche no miente: se saltea el sorteo de `PERRO_MIENTE` entero. Se
-      // detecta acá y no en `resolverNoche()` porque los candidatos de esta
-      // noche —de donde sale el tramo más duro que se revela— todavía no
-      // existían cuando resolvió la noche anterior.
-      const perroExploroYSobrevivio =
-        estado.nocheActual?.perroExplorando === true && estado.perro.presente;
-
-      if (!perroExploroYSobrevivio && rng.suerte(PERRO_MIENTE)) {
-        const alternativas = alertas.filter((a) => a !== alertaCorrecta);
-        alerta = rng.elegir(alternativas);
-        diceVerdad = false;
-      }
-
-      const tramoMasDuro = candidatos.reduce(
-        (masDuro, c) => (c.dureza > masDuro.dureza ? c : masDuro),
-        candidatos[0]!,
-      );
-
-      // Trato (D9, C3): si esta travesía lo ofrece, la noche ya salió
-      // sorteada al `empezar` (`estado.nocheTrato`). Acá solo se resuelve A
-      // QUIÉN, si esta es esa noche — depende de cómo viene la partida ahora.
-      let tratoOfrecidoA = estado.tratoOfrecidoA;
-      if (tratoOfrecidoA === undefined && siguienteNoche === estado.nocheTrato) {
-        // Evaluar viajero con mayor retraso en objetivo
-        let maxScore = -1;
-        let viajerosCandidatos: Viajero[] = [];
-        for (const v of estado.viajeros) {
-          let score = 3 - v.vigor; // por default
-          if (v.objetivo === 'mano-propia') {
-            // contar de crónica
-            let countEffort = 0;
-            for (const entry of estado.cronica) {
-              const fact = entry.hechos.find((h) => h.startsWith('esfuerzo:'));
-              if (fact && fact.substring(9).includes(v.nombre)) {
-                countEffort++;
-              }
-            }
-            score = 5 - countEffort;
-          }
-          if (score > maxScore) {
-            maxScore = score;
-            viajerosCandidatos = [v];
-          } else if (score === maxScore) {
-            viajerosCandidatos.push(v);
-          }
-        }
-        if (viajerosCandidatos.length > 0) {
-          const elegido = rng.elegir(viajerosCandidatos);
-          tratoOfrecidoA = elegido.id;
-        }
-      }
-
-      // Ceguera: noches 3 y 4
-      const viajeros = estado.viajeros.map((v) => ({ ...v, cegado: false }));
-      if (siguienteNoche === 3 || siguienteNoche === 4) {
-        const rolesEnJuego = Array.from(new Set(estado.viajeros.map((v) => v.rol)));
-        const rolesCegadosPrevios: Rol[] = [];
-        for (const entry of estado.cronica) {
-          const fact = entry.hechos.find((h) => h.startsWith('cegado:'));
-          if (fact) {
-            rolesCegadosPrevios.push(fact.substring(7) as Rol);
-          }
-        }
-        const candidatosCeguera = rolesEnJuego.filter(
-          (r) => !rolesCegadosPrevios.includes(r)
-        );
-        const rolCegado = rng.elegir(
-          candidatosCeguera.length > 0 ? candidatosCeguera : rolesEnJuego
-        );
-        viajeros.forEach((v) => {
-          if (v.rol === rolCegado) {
-            v.cegado = true;
-          }
-        });
-      }
-
-      const nocheActual: EstadoNoche = {
-        numero: siguienteNoche,
-        candidatos,
-        boletas: {},
-        venceEn: ahora + TIEMPOS.acamparMs,
-      };
-
-      const nuevoEstado: EstadoPartida = {
-        ...estado,
-        fase: 'acampar',
-        noche: siguienteNoche,
-        viajeros,
-        nocheActual,
-        perro: {
-          presente: estado.perro.presente,
-          alerta,
-          dice_la_verdad: diceVerdad,
-          ...(perroExploroYSobrevivio ? { tramoRevelado: tramoMasDuro.nombre } : {}),
-        },
-        ...(tratoOfrecidoA !== undefined ? { tratoOfrecidoA } : {}),
-      };
-
-      const gatillosPerro: Gatillo[] =
-        alerta !== 'ninguna' ? [{ tipo: 'alerta', que: 'perro', duracionMs: TIEMPOS.alertaMs }] : [];
-
-      return {
-        ok: true,
-        transicion: {
-          estado: nuevoEstado,
-          efectos: [
-            { t: 'agendar', enMs: TIEMPOS.acamparMs },
-            { t: 'publicar', a: 'todos', gatillos: gatillosPerro },
-          ],
-        },
-      };
-    }
-    return { ok: false, motivo: 'fuera_de_fase' };
-  }
-
-  // epilogo -> fin
-  if (estado.fase === 'epilogo') {
-    if (comando.t === 'vencio_fase') {
-      return {
-        ok: true,
-        transicion: {
-          estado,
-          efectos: [{ t: 'terminar' }],
-        },
-      };
-    }
-    return { ok: false, motivo: 'fuera_de_fase' };
-  }
-
-  return { ok: false, motivo: 'jugada_invalida' };
+      }),
+    },
+    TIEMPOS.emboscadaMs,
+  );
 }
 
-function resolverNoche(
-  estado: EstadoPartida,
-  ahora: number,
-  porTimeout: boolean
-): Resultado {
-  const rng = crearRng(estado.semilla + '-resolucion-noche-' + estado.noche);
-  const tablero = obtenerTablero(estado.tablero);
-  const candidatos = estado.nocheActual!.candidatos;
-
-  // Autocompletar boletas ausentes
-  const boletas: Record<JugadorId, Boleta> = { ...estado.nocheActual!.boletas };
-  for (const v of estado.viajeros) {
-    let b = boletas[v.id];
-    if (!b || b.bloqueadaEn === 0) {
-      // Es ausente
-      let ruta = b?.ruta;
-      let raciones = b?.raciones;
-
-      // Si no eligió ruta/raciones, votar por mayoría del resto
-      if (!ruta) {
-        const votosRuta: Record<string, number> = {};
-        candidatos.forEach((c) => {
-          votosRuta[c.id] = 0;
-        });
-        Object.values(boletas).forEach((x) => {
-          if (x.bloqueadaEn > 0 && x.ruta) votosRuta[x.ruta] = (votosRuta[x.ruta] || 0) + 1;
-        });
-        let maxVotos = -1;
-        let rutaGanadora = candidatos[0]!.id;
-        candidatos.forEach((c) => {
-          if ((votosRuta[c.id] || 0) > maxVotos) {
-            maxVotos = votosRuta[c.id] || 0;
-            rutaGanadora = c.id as TramoId;
-          }
-        });
-        ruta = rutaGanadora;
-      }
-
-      if (!raciones) {
-        const votosRac: Record<string, number> = { ajustado: 0, normal: 0, abundante: 0 };
-        Object.values(boletas).forEach((x) => {
-          if (x.bloqueadaEn > 0 && x.raciones) {
-            votosRac[x.raciones] = (votosRac[x.raciones] || 0) + 1;
-          }
-        });
-        let maxVotos = -1;
-        let racGanadora: NivelRaciones = 'normal';
-        (['ajustado', 'normal', 'abundante'] as NivelRaciones[]).forEach((r) => {
-          if ((votosRac[r] || 0) > maxVotos) {
-            maxVotos = votosRac[r] || 0;
-            racGanadora = r;
-          }
-        });
-        raciones = racGanadora;
-      }
-
-      boletas[v.id] = {
-        ruta,
-        raciones,
-        bloqueadaEn: ahora,
-      };
-    }
-  }
-
-  // 1. Conteo de boletas
-  const capataz = estado.viajeros.find((v) => v.rol === 'capataz');
-
-  // Ruta
-  let decisionRuta: TramoId = candidatos[0]!.id as TramoId;
-  let viaRuta: any = 'mayoria';
-
-  if (estado.noche === 5 && capataz) {
-    // Noche 5: Capataz decide solo, salvo que TODOS los demás voten lo mismo y distinto a él
-    const votoCapataz = boletas[capataz.id]?.ruta ?? (candidatos[0]!.id as TramoId);
-    const otrosVotos = estado.viajeros
-      .filter((v) => v.id !== capataz.id)
-      .map((v) => boletas[v.id]?.ruta);
-
-    const primerOtro = otrosVotos[0];
-    const todosIguales = otrosVotos.every((v) => v === primerOtro && v !== undefined);
-
-    if (todosIguales && primerOtro !== votoCapataz) {
-      decisionRuta = primerOtro as TramoId;
-      viaRuta = 'oposicion_unanime';
-    } else {
-      decisionRuta = votoCapataz;
-      viaRuta = 'capataz_solo';
-    }
-  } else {
-    // Mayoría simple
-    const votosRuta: Record<string, number> = {};
-    candidatos.forEach((c) => {
-      votosRuta[c.id] = 0;
-    });
-    estado.viajeros.forEach((v) => {
-      const r = boletas[v.id]?.ruta;
-      if (r) votosRuta[r] = (votosRuta[r] || 0) + 1;
-    });
-
-    let maxVotos = -1;
-    let candidatasGanadoras: TramoId[] = [];
-    candidatos.forEach((c) => {
-      const v = votosRuta[c.id] || 0;
-      if (v > maxVotos) {
-        maxVotos = v;
-        candidatasGanadoras = [c.id as TramoId];
-      } else if (v === maxVotos) {
-        candidatasGanadoras.push(c.id as TramoId);
-      }
-    });
-
-    if (candidatasGanadoras.length === 1) {
-      decisionRuta = candidatasGanadoras[0]!;
-      viaRuta = porTimeout ? 'vencio_el_tiempo' : 'mayoria';
-    } else {
-      // Empate: decide Capataz
-      const votoCapataz = capataz ? boletas[capataz.id]?.ruta : undefined;
-      if (votoCapataz && candidatasGanadoras.includes(votoCapataz as TramoId)) {
-        decisionRuta = votoCapataz as TramoId;
-        viaRuta = 'desempate_capataz';
-      } else {
-        decisionRuta = rng.elegir(candidatasGanadoras);
-        viaRuta = 'mayoria'; // fallback
-      }
-    }
-  }
-
-  // Raciones
-  let decisionRaciones: NivelRaciones = 'normal';
-  const votosRaciones: Record<NivelRaciones, number> = { ajustado: 0, normal: 0, abundante: 0 };
-  estado.viajeros.forEach((v) => {
-    const r = boletas[v.id]?.raciones;
-    if (r) votosRaciones[r]++;
-  });
-
-  let maxVotosRac = -1;
-  let racionesGanadoras: NivelRaciones[] = [];
-  (['ajustado', 'normal', 'abundante'] as NivelRaciones[]).forEach((r) => {
-    const v = votosRaciones[r];
-    if (v > maxVotosRac) {
-      maxVotosRac = v;
-      racionesGanadoras = [r];
-    } else if (v === maxVotosRac) {
-      racionesGanadoras.push(r);
-    }
-  });
-
-  if (racionesGanadoras.length === 1) {
-    decisionRaciones = racionesGanadoras[0]!;
-  } else {
-    const votoCapataz = capataz ? boletas[capataz.id]?.raciones : undefined;
-    if (votoCapataz && racionesGanadoras.includes(votoCapataz)) {
-      decisionRaciones = votoCapataz;
-    } else {
-      decisionRaciones = 'normal';
-    }
-  }
-
-  // Esfuerzo (D19): ya no se vota, lo reparte el Capataz —o cada uno a sí
-  // mismo si no hay Capataz en la mesa— con el comando `asignar_esfuerzo`,
-  // independiente de la boleta. La validación de quién puede asignar y a
-  // quién ya pasó en el reducer de `decidir`; acá solo se filtra por vigor
-  // (por si algo cambió entre la asignación y el cierre) y se corta al máximo.
-  const decisionEsfuerzo = (estado.nocheActual!.esfuerzoAsignado ?? [])
-    .filter((id) => {
-      const v = estado.viajeros.find((x) => x.id === id);
-      return v !== undefined && v.vigor > 0;
-    })
-    .slice(0, AVANCE.esfuerzoMax);
-
-  // Revelación del fogón (D18): se computa acá, con los nombres ya resueltos a
-  // texto, porque `nocheActual` no sobrevive el pasaje a `epilogo` y la última
-  // noche tiene que poder revelarse igual (ver estado.ts § RevelacionBoletas).
-  const nombreDe = (id: JugadorId) => estado.viajeros.find((v) => v.id === id)?.nombre ?? '';
-  const ultimaRevelacion: RevelacionBoletas = {
-    noche: estado.noche,
-    ruta: candidatos.map((c) => ({
-      nombre: c.nombre,
-      votantes: estado.viajeros.filter((v) => boletas[v.id]?.ruta === c.id).map((v) => v.nombre),
-      gano: c.id === decisionRuta,
-    })),
-    raciones: (['ajustado', 'normal', 'abundante'] as NivelRaciones[]).map((nivel) => ({
-      nivel,
-      votantes: estado.viajeros.filter((v) => boletas[v.id]?.raciones === nivel).map((v) => v.nombre),
-      gano: nivel === decisionRaciones,
-    })),
-    esfuerzo: decisionEsfuerzo.map((id) => nombreDe(id)),
-    // Solo si el Capataz efectivamente repartió: si no llegó a hacerlo, la TV
-    // no puede atribuirle un reparto que no hizo.
-    ...(capataz && (estado.nocheActual!.esfuerzoRespondieron ?? []).includes(capataz.id)
-      ? { repartio: capataz.nombre }
-      : {}),
-    via: viaRuta,
-  };
-
-  // 12 pasos de resolución
-  // 1. Se fija la ruta
-  const tramoElegido = candidatesFind(candidatos, decisionRuta) || candidatos[0]!;
-
-  // 2. Avance
-  let avanceNoche = AVANCE.base + decisionEsfuerzo.length * AVANCE.porEsfuerzo - tramoElegido.dureza;
-  avanceNoche = Math.max(0, avanceNoche);
-  const nuevoAvance = estado.avance + avanceNoche;
-
-  // 3. Consumo
-  const viajerosActivos = estado.viajeros.length;
-  let consumo = viajerosActivos * RACIONES.consumoPorViajero[decisionRaciones] + tramoElegido.costoRecurso;
-  consumo = Math.max(0, consumo);
-
-  // Objeto 'bordalesa' en El Salitral: suma a la capacidad del tablero, no la
-  // fija (antes era `capacidad = 38`, asumiendo a mano la capacidad de La
-  // Sierra — con otro tablero quedaba mal).
-  let capacidad = estado.capacidad;
-  if (estado.objetos.some((o) => o.arquetipo === 'bordalesa')) {
-    capacidad += OBJETOS_CAPACIDAD.bordalesaBono;
-  }
-
-  // Objeto 'yunque-de-mano' aumenta la carga y ocupa capacidad de raciones
-  if (estado.objetos.some((o) => o.arquetipo === 'yunque-de-mano')) {
-    capacidad = Math.max(0, capacidad - OBJETOS_CAPACIDAD.yunqueDeManoCosto);
-  }
-
-  const recursoEfectivo = Math.min(estado.recurso, consumo);
-  const nuevoRecurso = Math.max(0, Math.min(capacidad, estado.recurso - consumo));
-
-  const viajerosModificados = estado.viajeros.map((v) => ({ ...v }));
-
-  // 4. Vigor por esfuerzo
-  // Objeto 'yunque-de-mano': el trabajo pesado cuesta 1 de vigor menos
-  const tieneYunque = estado.objetos.some((o) => o.arquetipo === 'yunque-de-mano');
-  // Objeto 'bordalesa': el trabajo pesado cuesta 1 de vigor más
-  const tieneBordalesa = estado.objetos.some((o) => o.arquetipo === 'bordalesa');
-
-  decisionEsfuerzo.forEach((id) => {
-    const v = viajerosModificados.find((x) => x.id === id);
-    if (v) {
-      let costo: number = AVANCE.costoEsfuerzoVigor;
-      if (tieneYunque) costo = Math.max(0, costo - 1);
-      if (tieneBordalesa) costo += 1;
-      v.vigor = Math.max(0, v.vigor - costo) as Vigor;
-    }
-  });
-
-  // 5. Vigor por raciones
-  viajerosModificados.forEach((v) => {
-    const delta = RACIONES.efectoVigor[decisionRaciones];
-    v.vigor = Math.max(0, Math.min(VIGOR_MAX, v.vigor + delta)) as Vigor;
-  });
-
-  // 6. Hambre
-  const pagoIncompleto = recursoEfectivo < consumo;
-  if (pagoIncompleto) {
-    viajerosModificados.forEach((v) => {
-      v.vigor = Math.max(0, v.vigor - 1) as Vigor;
-    });
-  }
-
-  // 7. Objetos activos
-  // Manta de lana: el portador pasa 1 de vigor a otro
-  const mantaObj = estado.objetos.find((o) => o.arquetipo === 'manta-de-lana');
-  if (mantaObj && mantaObj.portador) {
-    const portador = viajerosModificados.find((x) => x.id === mantaObj.portador);
-    const masDebil = [...viajerosModificados]
-      .filter((x) => x.id !== portador?.id)
-      .sort((a, b) => a.vigor - b.vigor)[0];
-
-    if (portador && portador.vigor >= 2 && masDebil && masDebil.vigor <= 1) {
-      portador.vigor = (portador.vigor - 1) as Vigor;
-      masDebil.vigor = Math.min(3, masDebil.vigor + 1) as Vigor;
-    }
-  }
-
-  // Aguardiente: restaura 1 de vigor a todos; en la noche 5 todos pierden 1
-  const tieneAguardiente = estado.objetos.some((o) => o.arquetipo === 'aguardiente');
-  if (tieneAguardiente && estado.noche < 5) {
-    viajerosModificados.forEach((v) => {
-      v.vigor = Math.min(3, v.vigor + 1) as Vigor;
-    });
-  }
-  if (estado.noche === 5) {
-    // Si alguna vez se usó aguardiente, se cobra en la noche 5
-    // En la noche 5 todos pierden 1
-    const seUsoAguardiente = estado.cronica.some((entry) =>
-      entry.hechos.some((h) => h.includes('objeto:aguardiente'))
-    );
-    if (seUsoAguardiente || tieneAguardiente) {
-      viajerosModificados.forEach((v) => {
-        v.vigor = Math.max(0, v.vigor - 1) as Vigor;
-      });
-    }
-  }
-
-  // 8. Hallazgo
-  let nuevosObjetos = [...estado.objetos];
-  const hallo = rng.suerte(tramoElegido.hallazgo);
-  if (hallo && nuevosObjetos.length < 4) {
-    const arquetiposDisponibles = tablero.mazoObjetos.filter(
-      (arc) => !nuevosObjetos.some((o) => o.arquetipo === arc.id)
-    );
-    if (arquetiposDisponibles.length > 0) {
-      const arc = rng.elegir(arquetiposDisponibles);
-      const portadoresCandidatos = viajerosModificados.filter((v) => v.objeto === undefined);
-      if (portadoresCandidatos.length > 0) {
-        const portador = rng.elegir(portadoresCandidatos);
-        const objId = objetoId(rng.entero(1000, 9999).toString());
-        const nuevoObj = {
-          id: objId,
-          arquetipo: arc.id,
-          portador: portador.id,
-          usosRestantes: arc.usos,
-          identificado: false,
-        };
-        nuevosObjetos.push(nuevoObj);
-        portador.objeto = objId;
-      }
-    }
-  }
-
-  // 9. Degradación de objetos
-  nuevosObjetos.forEach((o) => {
-    o.usosRestantes--;
-  });
-  // Filtrar de viajeros los que se cayeron
-  nuevosObjetos = nuevosObjetos.filter((o) => {
-    if (o.usosRestantes <= 0) {
-      const v = viajerosModificados.find((x) => x.id === o.portador);
-      if (v) {
-        delete v.objeto;
-      }
-      return false;
-    }
-    return true;
-  });
-
-  // 10. El perro explora, si el Capataz lo mandó esta noche (A2, D10). Riesgo
-  // fijo `PERRO_EXPLORA_RIESGO`: puede no volver. Si vuelve, la transición
-  // fogon → acampar de más abajo es la que aprovecha el resultado (saltea la
-  // mentira de la noche siguiente y revela el tramo más duro) porque los
-  // candidatos de esa noche todavía no existen acá.
-  let perroPresente = estado.perro.presente;
-  const perroMandadoAExplorar = estado.nocheActual!.perroExplorando === true;
-  if (perroMandadoAExplorar && perroPresente && rng.suerte(PERRO_EXPLORA_RIESGO)) {
-    perroPresente = false;
-  }
-
-  // 11. Trato privado
-  if (estado.noche === 5 && estado.tratoOfrecidoA) {
-    const target = viajerosModificados.find((x) => x.id === estado.tratoOfrecidoA);
-    if (target && target.aceptoElTrato) {
-      viajerosModificados.forEach((v) => {
-        if (v.id !== target.id) {
-          v.vigor = Math.max(0, v.vigor - 1) as Vigor;
-        }
-      });
-    }
-  }
-
-  // Registrar hechos
-  const hechos: string[] = [];
-  hechos.push(`tramo:${tramoElegido.nombre}`);
-  hechos.push(`avance:${avanceNoche}`);
-  hechos.push(`recurso:${recursoEfectivo}`);
-  if (pagoIncompleto) hechos.push('hambre');
-  if (perroMandadoAExplorar) hechos.push(perroPresente ? 'perro_exploro' : 'perro_perdido');
-  if (decisionEsfuerzo.length > 0) {
-    const nombresEsfuerzo = decisionEsfuerzo
-      .map((id) => viajerosModificados.find((x) => x.id === id)?.nombre ?? '')
-      .filter(Boolean);
-    hechos.push(`esfuerzo:${nombresEsfuerzo.join(',')}`);
-  }
-  viajerosModificados.forEach((v) => {
-    const prevV = estado.viajeros.find((x) => x.id === v.id);
-    if (v.vigor === 0 && (prevV?.vigor ?? 0) > 0) {
-      hechos.push(`quiebre:${v.nombre}`);
-    }
-  });
-
-  // Si alguien quedó ciego esta noche, registrarlo
-  const cegado = viajerosModificados.find((v) => v.cegado);
-  if (cegado) {
-    hechos.push(`cegado:${cegado.rol}`);
-  }
-
-  // Si hubo trato esta noche, registrarlo
-  if (estado.tratoOfrecidoA && estado.nocheActual) {
-    const target = viajerosModificados.find((x) => x.id === estado.tratoOfrecidoA);
-    if (target && target.aceptoElTrato) {
-      hechos.push(`trato_aceptado:${target.nombre}`);
-    }
-  }
-
-  // Registrar objetos encontrados
-  nuevosObjetos.forEach((o) => {
-    if (!estado.objetos.some((x) => x.id === o.id)) {
-      const portadorNombre = viajerosModificados.find((x) => x.id === o.portador)?.nombre ?? '';
-      hechos.push(`objeto:${o.arquetipo},portador:${portadorNombre}`);
-    }
-  });
-
-  // Construir entrada de crónica
-  const relatoRespaldo = tablero.respaldos['resolucion']
-    ? rng.elegir(tablero.respaldos['resolucion'])
-    : 'Avanzamos un tramo en la penumbra.';
-
-  const nuevaCronica: EntradaCronica = {
-    noche: estado.noche,
-    hechos,
-    relato: relatoRespaldo,
-    origen: 'respaldo',
-  };
-
-  const nuevoEstado: EstadoPartida = {
-    ...estado,
-    fase: 'resolver',
-    avance: nuevoAvance,
-    recurso: nuevoRecurso,
-    viajeros: viajerosModificados,
-    objetos: nuevosObjetos,
-    cronica: [...estado.cronica, nuevaCronica],
-    perro: { ...estado.perro, presente: perroPresente },
-    esfuerzoNocheAnterior: decisionEsfuerzo,
-    ultimaRevelacion,
-  };
-
-  // Efecto LLM
-  const pedido: PedidoRelato = {
-    escena: 'resolucion',
-    voz: tablero.vozDelCamino,
-    hechos,
-    menu: [],
-    limitePalabras: 25,
-    fondos: tablero.fondos,
-  };
-
-  // Gatillos de esta noche: la resolución siempre anima; objeto, quiebre y
-  // perro_perdido son condicionales a lo que efectivamente pasó (los mismos
-  // hechos que ya se registraron arriba, no un chequeo nuevo).
-  const gatillosNoche: Gatillo[] = [{ tipo: 'resolucion', duracionMs: TIEMPOS.resolverMs }];
-  if (hechos.some((h) => h.startsWith('quiebre:'))) {
-    gatillosNoche.push({ tipo: 'alerta', que: 'quiebre', duracionMs: TIEMPOS.alertaMs });
-  }
-  if (hechos.some((h) => h.startsWith('objeto:'))) {
-    gatillosNoche.push({ tipo: 'alerta', que: 'objeto', duracionMs: TIEMPOS.alertaMs });
-  }
-  if (hechos.includes('perro_perdido')) {
-    gatillosNoche.push({ tipo: 'alerta', que: 'perro', duracionMs: TIEMPOS.alertaMs });
-  }
-
+function bancarATodos(estado: EstadoPartida): EstadoPartida {
   return {
-    ok: true,
-    transicion: {
-      estado: nuevoEstado,
-      efectos: [
-        { t: 'pedir_relato', pedido },
-        { t: 'agendar', enMs: TIEMPOS.resolverMs },
-        { t: 'publicar', a: 'todos', gatillos: gatillosNoche },
+    ...estado,
+    jugadores: estado.jugadores.map((j) =>
+      j.lugar === 'camino'
+        ? { ...j, baul: j.baul + j.mochila, ganadoNoche: j.ganadoNoche + j.mochila, mochila: 0, lugar: 'campamento' }
+        : j,
+    ),
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* Sigo o me vuelvo                                                    */
+/* ------------------------------------------------------------------ */
+
+function abrirDecision(estado: EstadoPartida): Resultado {
+  return listo(
+    {
+      ...estado,
+      fase: 'decidir',
+      perro: olfatear(estado),
+      jugadores: estado.jugadores.map((j) => (j.lugar === 'camino' ? { ...j, eleccion: null } : j)),
+    },
+    TIEMPOS.decidirMs,
+  );
+}
+
+/** Qué cara pone el perro según lo que viene. Público, y a veces equivocado. */
+export function olfatear(estado: EstadoPartida): AvisoPerro {
+  const proxima = estado.mazo[0];
+  if (proxima === undefined) return 'tranquilo';
+  const letal =
+    proxima.t === 'peligro' &&
+    estado.camino.some((c) => c.carta.t === 'peligro' && c.carta.tipo === proxima.tipo);
+  const tabla = letal ? PERRO.letal : proxima.t === 'peligro' ? PERRO.peligro : PERRO.hallazgo;
+  const r = crearRng(`${estado.semilla}:${estado.ronda}:perro:${estado.noche}:${estado.camino.length}`).siguiente();
+  if (r < tabla.tranquilo) return 'tranquilo';
+  if (r < tabla.tranquilo + tabla.inquieto) return 'inquieto';
+  return 'grune';
+}
+
+function elegir(estado: EstadoPartida, id: JugadorId, opcion: Eleccion): Resultado {
+  if (estado.fase !== 'decidir') return rechazo('fuera_de_fase');
+  const jugador = estado.jugadores.find((j) => j.id === id);
+  if (jugador === undefined) return rechazo('jugador_desconocido');
+  if (jugador.lugar !== 'camino') return rechazo('no_esta_en_el_camino');
+  // Un toque y queda. Cambiar de idea después de ver la cara del de al lado
+  // sería otro juego.
+  if (jugador.eleccion !== null) return rechazo('ya_eligio');
+
+  const siguiente: EstadoPartida = {
+    ...estado,
+    jugadores: estado.jugadores.map((j) => (j.id === id ? { ...j, eleccion: opcion } : j)),
+  };
+  // Si ya eligieron todos, no hay por qué esperar al reloj.
+  if (enCamino(siguiente).every((j) => j.eleccion !== null)) return cerrarDecision(siguiente);
+  // Sin `agendar`: el reloj que ya corre sigue siendo el que manda. Y sin
+  // subir `paso`: no es una fase nueva, y los celulares que todavía no
+  // eligieron no tienen que volver a vibrar porque eligió otro.
+  return { ok: true, estado: siguiente, efectos: [{ t: 'publicar' }] };
+}
+
+function cerrarDecision(estado: EstadoPartida): Resultado {
+  const presentes = enCamino(estado);
+  const callados = presentes.filter((j) => j.eleccion === null).map((j) => j.id);
+  const volvieron = presentes.filter((j) => j.eleccion === 'vuelvo').map((j) => j.id);
+  const siguieron = presentes.filter((j) => j.eleccion !== 'vuelvo').map((j) => j.id);
+
+  const tirado = estado.camino.reduce((s, c) => s + c.resto, 0);
+  const cadaUno = volvieron.length > 0 ? Math.floor(tirado / volvieron.length) : 0;
+  const sobra = volvieron.length > 0 ? tirado % volvieron.length : tirado;
+
+  // Lo que no se pudo repartir entre los que volvieron se queda en el camino.
+  // Se junta en el último tramo con resto para que la TV lo siga mostrando.
+  let camino = estado.camino;
+  if (volvieron.length > 0) {
+    camino = estado.camino.map((c) => ({ ...c, resto: 0 }));
+    if (sobra > 0) {
+      const i = camino.map((c) => c.carta.t).lastIndexOf('hallazgo');
+      if (i >= 0) camino[i] = { ...camino[i]!, resto: sobra };
+    }
+  }
+
+  const nadieHabiaVuelto = estado.jugadores.every((j) => j.lugar !== 'campamento');
+  const vaciaElCamino = volvieron.length > 0 && siguieron.length === 0;
+  const solo = volvieron.length === 1;
+
+  return listo(
+    {
+      ...estado,
+      fase: 'retirada',
+      perro: null,
+      camino,
+      retirada: { volvieron, siguieron, callados, cadaUno },
+      jugadores: estado.jugadores.map((j) => {
+        if (j.lugar !== 'camino') return j;
+        if (!volvieron.includes(j.id)) return { ...j, eleccion: j.eleccion ?? 'sigo' };
+        const lleva = j.mochila + cadaUno;
+        return {
+          ...j,
+          lugar: 'campamento',
+          baul: j.baul + lleva,
+          ganadoNoche: j.ganadoNoche + lleva,
+          mochila: 0,
+          stats: {
+            ...j.stats,
+            volvioSolo: j.stats.volvioSolo + (solo && cadaUno > 0 ? 1 : 0),
+            primeroEnVolver: j.stats.primeroEnVolver + (nadieHabiaVuelto ? 1 : 0),
+            ultimoEnVolver: j.stats.ultimoEnVolver + (vaciaElCamino ? 1 : 0),
+          },
+        };
+      }),
+    },
+    TIEMPOS.retiradaMs,
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Cierre                                                              */
+/* ------------------------------------------------------------------ */
+
+function terminarNoche(estado: EstadoPartida, motivo: FinDeNoche): Resultado {
+  const tipo = motivo === 'emboscada' ? estado.emboscada?.tipo : undefined;
+  return listo(
+    {
+      ...estado,
+      fase: 'fin_noche',
+      perro: null,
+      historial: [
+        ...estado.historial,
+        {
+          noche: estado.noche,
+          motivo,
+          ...(tipo !== undefined ? { tipo } : {}),
+          tramos: estado.camino.length,
+          filas: estado.jugadores.map((j) => ({ jugador: j.id, ganado: j.ganadoNoche, perdido: j.perdidoNoche })),
+        },
       ],
     },
-  };
-}
-
-function candidatesFind(candidates: any[], id: string) {
-  return candidates.find((c) => c.id === id);
+    TIEMPOS.finNocheMs,
+  );
 }

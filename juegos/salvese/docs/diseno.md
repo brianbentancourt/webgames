@@ -2,214 +2,154 @@
 
 ## Pilares
 
-1. **Se habla.** El juego pasa en la mesa, no en las pantallas.
-2. **Nadie decide solo.** Ninguna habilidad sirve con la información propia.
-3. **Toda decisión duele contra una persona**, no contra una opción abstracta.
-4. **La partida deja una anécdota.** Ese es el producto real.
+1. **Todos juegan siempre.** Nadie espera turno. Cada vuelta, todos deciden a la vez.
+2. **Un toque, una revelación.** El celular se usa un segundo; la tele muestra el resultado
+   enseguida, y el resultado es lo que se grita.
+3. **La codicia se ve.** Lo que arriesgás es público, lo que guardaste es secreto.
+4. **La partida deja una anécdota.** "Se volvió solo y se llevó todo" es el producto real.
 
 ---
 
-## Loop de una noche (~4 min)
+## Una noche
 
 ```
-ACAMPAR  →  DECIDIR  →  RESOLVER  →  FOGÓN
- (info)     (3 min)     (7 seg)     (30 seg)
+PRESENTACIÓN → TRAMO → ¿SIGO O ME VUELVO? → RETIRADA ─┐
+   (4 s)       (3 s)        (≤15 s)            (4 s)   │
+                 ▲                                     │
+                 └──── queda alguien en el camino ─────┘
 ```
 
-- **Acampar** — cada celular recibe lo suyo. La TV muestra el estado del grupo.
-- **Decidir** — dos decisiones en la boleta (ruta, raciones) más el reparto del
-  esfuerzo, que el Capataz maneja aparte y todas las noches. Se discute en voz alta,
-  la boleta se bloquea en secreto y el esfuerzo se reparte en secreto también.
-  **La fogata es el reloj**: se consume durante la ventana y la luz sobre los
-  viajeros baja con ella. Los dígitos aparecen solo en los últimos 30 segundos.
-- **Resolver** — única cutscene de la noche. La caravana avanza y el camino cuenta qué pasó.
-- **Fogón** — se revela quién votó qué la noche anterior, con nombre, y a quién se
-  mandó al trabajo pesado. El camino hace una pregunta incómoda sobre lo que acaban
-  de hacer y le pasa el micrófono al grupo: acá es donde alguien dice *"¡vos dijiste
-  que ibas al río!"*.
+- **Tramo.** La tele da vuelta una carta del mazo de la noche.
+  - **Hallazgo**: un número. Se divide parejo entre los que siguen en el camino; lo que
+    no se puede dividir queda **tirado** en ese tramo.
+  - **Peligro**: el primero de cada tipo es un susto y no pasa nada. **El segundo del
+    mismo tipo es la emboscada**: los que siguen en el camino pierden todo lo que cargan
+    y la noche se termina. Una copia de ese peligro sale del juego.
+- **¿Sigo o me vuelvo?** Cada uno toca en secreto. La ventana se cierra cuando eligieron
+  todos o a los 15 segundos; el que no eligió, sigue.
+- **Retirada.** Se revela todo junto. Los que se vuelven guardan su mochila en el baúl y
+  se reparten lo tirado en el camino. Si vuelve uno solo, se lo lleva todo.
+- La noche termina cuando no queda nadie en el camino o cuando hay emboscada. Después viene
+  el **balance**: qué ganó y qué perdió cada uno esa noche. El baúl sigue siendo secreto.
+
+Cinco noches. Gana el baúl más lleno.
 
 ---
 
-## Roles
+## Qué es público y qué no
 
-Nombre lindo en la TV, nombre plano en el celular. Nadie tiene que aprender vocabulario.
-
-| Rol | En el celu | Ve | No ve |
-|---|---|---|---|
-| Baqueano | el que ve el camino | el terreno de **una** ruta por noche | el estado de la gente |
-| Curandera | la que ve a la gente | el estado real de cada viajero | cuántos días faltan |
-| Despensero | el que cuenta la comida | el inventario exacto | quién aguanta el hambre |
-| Memorioso | el que se acuerda | el registro de travesías previas (a veces falso) | el presente |
-| Capataz | el que manda | nada | nada — tiene poder, no información |
-
-**El Capataz no vota: reparte.** Todas las noches nombra hasta 3 viajeros para el
-trabajo pesado — no solo en los empates y en la noche 5. No puede mandar a la misma
-persona dos noches seguidas: sin esa fricción el óptimo es obvio y la decisión se
-muere en la segunda noche. Sin Capataz en la mesa (2 y 3 jugadores) el esfuerzo es
-voluntario: cada uno declara si se ofrece.
-
-**Combos**: las jugadas fuertes exigen dos personas sincronizadas en la misma ventana.
-Eso no se coordina con un botón, se coordina hablando.
-
-**Objetivos personales**: cada uno lleva uno, secreto, revelado solo al final. Nadie es
-traidor — hay gente con prioridades distintas. La revelación reinterpreta la partida entera.
-
----
-
-## Escalado 2 → 10
-
-| Jugadores | Cómo |
-|---|---|
-| 2 | La IA ocupa dos sillas y las actúa con opinión propia. Discute, insiste, se equivoca. |
-| 3 | Baqueano, Curandera y Despensero, uno por persona. Sin Capataz: el esfuerzo se ofrece voluntario, cada uno declara si se ofrece (D19). Sin Memorioso: no hay registro de travesías previas que consultar. |
-| 4–5 | Un rol por persona. **Punto óptimo: 5.** |
-| 6–8 | Los roles se van duplicando **de a uno** según entra gente —primero el Baqueano, después la Curandera, después el Despensero—, así que no todos son pareja al mismo tiempo. Donde hay pareja, acuerda entre sí antes de hablarle al grupo. El Capataz nunca se duplica: es el que manda y reparte el trabajo pesado todas las noches desde D19, y dos personas mandando no es un rol, es un empate. |
-| 9–10 | Parejas + **pasajeros**: sin habilidad, con voto y objetivo propio. Son el pueblo. |
-
-El límite no es técnico, es de aire para hablar. Nadie espera turno en ninguna configuración.
-
----
-
-## Curva de 5 noches
-
-- **1–2** — tiempo de sobra. Tutorial encubierto: el celular no da opciones, da **tu línea**
-  (*"decí en voz alta que la ruta de la izquierda tiene agua pero es más larga"*).
-  Las habilidades se abren de a una.
-- **3–4** — el fuego se consume más rápido y cada noche el camino **ciega a un rol distinto**.
-  Aprenden a jugar sin su mejor pieza.
-- **5** — se acaba la votación. El Capataz decide solo, salvo que los demás se opongan
-  **todos juntos**. Cambia la estructura social de la mesa, no los números.
-
----
-
-## El trato
-
-Una vez por travesía —no todas las noches— el camino le hace una oferta privada a **un**
-jugador. O a ninguno; lo decide el motor según cómo viene la partida.
-
-Aceptar da algo que sirve para el objetivo personal, con un costo grupal diferido.
-**No sos un traidor, sos alguien que aceptó ayuda.** Nunca hace perder a nadie: cambia el
-final y la crónica, no el resultado.
-
-La paranoia sale gratis porque "ninguno" siempre es posible.
-
----
-
-## Objetos
-
-**No se recogen: se reparten.** Solo una persona puede cargarlo, así que encontrar algo
-es automáticamente una discusión de dos minutos sobre quién.
-
-| Tipo | Qué hace |
-|---|---|
-| Redistribuye información | Da a quien lo carga una porción de lo que ve otro rol. El más valioso. |
-| No identificado | Nadie tiene el cuadro completo. Usarlo a ciegas es la apuesta. |
-| Pesa | Ocupa capacidad que era de las raciones. El costo tiene nombre propio. |
-| Daño diferido | Parecía bueno en la noche 2, se cobra en la 5. |
-| De bolsillo | Quien lo encuentra decide si lo declara. Un instante privado por partida. |
-
-**Límites**: máximo 3–4 objetos activos, y todos se degradan. Sin costo de guardar, todo
-grupo acumula y muere con el inventario lleno.
-
-Los objetos salen de un **mazo de arquetipos con efectos mecánicos duros**. El LLM elige del
-mazo y escribe la piel — nunca inventa el efecto.
+| Dato | Dónde | Por qué |
+|---|---|---|
+| Lo que carga cada uno | TV | Es lo que se arriesga: la mesa tiene que poder señalarlo |
+| Peligros que ya salieron esta noche | TV, arriba, grande | Es todo lo que hace falta para calcular el riesgo |
+| Lo tirado en el camino | TV | Es la tentación de volverse |
+| Quién ya eligió | TV (✓, sin decir qué) | Presión sobre el indeciso |
+| Qué eligió cada uno | TV, recién en la retirada | El desfasaje es el momento del grito |
+| El baúl | Solo tu celular | Nadie sabe con certeza quién gana: el bluff vive de eso |
 
 ---
 
 ## El perro
 
-No obedece: **avisa**. No lo controla nadie. Se para, mira, gruñe, no quiere avanzar.
+Antes de cada decisión olfatea la próxima carta y pone una cara, en la tele, para todos:
 
-- Es el único dato **público** en un juego donde todo lo demás es privado. Cambia la forma
-  de la conversación: hay algo en el medio que todos interpretan distinto.
-- **Miente una de cada cinco veces.** Con eso deja de ser oráculo y pasa a ser discusión.
-- **Se lo puede perder** si lo mandan a explorar. Es la única decisión que duele sin ser
-  contra un jugador.
-- La crónica final lo nombra, haya llegado o no.
+| Viene | tranquilo | inquieto | gruñe |
+|---|---|---|---|
+| El segundo de un peligro (letal) | 10% | 15% | **75%** |
+| Un peligro nuevo | 30% | **50%** | 20% |
+| Plata | **70%** | 20% | 10% |
 
-En la escena es el segundo foco de vida: duerme junto al fuego, se levanta cuando algo viene.
+Acierta casi siempre, nunca siempre. Un oráculo mata la discusión; un perro que a veces se
+equivoca la arranca ("¡gruñó la última vez y salió plata!").
 
 ---
 
-## Eventos especiales
+## Premios del final
 
-- **El silencio** — una noche por travesía sin poder hablar. Solo se bloquea en el celu.
-  Va en contra de todo el diseño y por eso funciona: entienden cuánto valía poder hablar.
-- **El que se suma** — alguien pide entrar a la caravana. Come raciones, aporta una habilidad,
-  no sabés si conviene. Se vota en voz alta, delante de él.
-- **El clima como información** — si el cielo se pone verdoso, algo viene. Se aprende a leer
-  sin que nadie lo explique.
+Salen de la conducta, no de un texto escrito. Uno por categoría, si alguien lo hizo al
+menos una vez. Si empatan en la punta lo comparten ("Beto y Emi"); si empata toda la mesa,
+no hay premio:
+
+- **El codicioso**: perdió más de una sola vez.
+- **El vivo**: se volvió solo y se llevó lo tirado.
+- **El gallina**: fue el primero en pegar la vuelta más noches.
+- **El temerario**: lo agarraron más veces.
+- **El último en irse**: se quedó hasta el final y volvió entero.
 
 ---
 
 ## Tableros
 
-Un tablero es un **paquete de datos**, no una pantalla nueva:
+Un tablero es un paquete de datos (`/tableros`): peligros con su texto de susto y de golpe,
+hallazgos con su valor, paleta y fondos. **Cada tablero cambia una regla, no solo la piel.**
 
-```js
-{
-  id, nombre, noches,
-  paleta,            // cielo, tres profundidades de cerro, brasa
-  cerros,            // siluetas
-  tramos,            // nombres de los pasos
-  recursoCritico,    // "raciones" | "agua" | ...
-  mazoObjetos,
-  vozDelCamino       // registro del relato
-}
-```
+| Tablero | Qué cambia |
+|---|---|
+| La Sierra | El base: tres copias de cada peligro, plata del 1 al 15 |
+| El Salitral | Cuatro copias de cada peligro, pero todo vale más. Volverse temprano y odiar al que se quedó |
 
-**Cada tablero cambia una regla, no solo la piel.** Si son cuatro paisajes con el mismo juego
-adentro, el grupo los prueba todos en una noche y no vuelve.
+Se vota desde los celulares en la sala.
 
-| Tablero | Noches | Qué rompe |
-|---|---|---|
-| La Sierra | 5 | El base. Raciones y frío. |
-| El Salitral | 5 | El recurso es agua y se viaja de noche: el Baqueano casi no ve, el Memorioso pasa a ser el rol fuerte. |
-| La Ciénaga | 7 | La carga pesa doble y los objetos se arruinan al doble. Todo el juego es qué dejar tirado. |
-| La Crecida | 3 | Sin descanso. La versión corta para cuando ya comieron. |
+---
 
-Se vota el tablero desde los celulares: una conversación más antes de empezar. El primero
-viene abierto, el resto se desbloquea al terminar una travesía.
+## Calibración
 
-**Para el MVP: dos tableros.** Uno solo no obliga a abstraer bien y terminás con el tablero
-hardcodeado.
+`apps/servidor/src/travesia.test.ts` juega cientos de partidas por tablero con bots que
+estiman el riesgo como una mesa (peligros a la vista contra lo que cargan) y vigila la
+forma, no los números exactos:
+
+- a cada jugador lo agarran entre 15% y 55% de las noches (hoy ~35%);
+- una noche dura entre 4 y 12 tramos (hoy ~7);
+- ninguna estrategia gana más de la mitad de las partidas;
+- la partida entra en 6 a 20 minutos (hoy ~12).
+
+Lo que la simulación no puede decir es si la mesa se ríe. Eso es el playtest.
 
 ---
 
 ## Presentación en TV
 
-Se mira **de reojo, no se lee**. Diseñado para 3 metros: tipografía mínima ~3% del alto,
-contraste alto, 5% de margen por overscan, cero hover, cero scroll, todo en una pantalla.
+Se mira de reojo desde el sillón. Tres franjas, siempre en el mismo lugar:
 
-Dirección de arte: **siluetas planas, teatro de sombras**, paleta de noche en capas (cerro
-lejano más claro por perspectiva atmosférica, cercano casi negro). Brasa como único cálido.
+- **Arriba**, el cartel: lo que acaba de pasar, en una frase. Y en la esquina, los peligros a la vista.
+- **En el medio**, el camino: las cartas dadas vuelta en fila, la última animada.
+- **Abajo**, la gente: a la izquierda el campamento con el fuego (los que se volvieron); a la
+  derecha el camino (los que siguen, con lo que cargan encima de la cabeza) y el perro adelante.
 
-Tres niveles de animación y nada más:
+El fuego del campamento es el reloj de la decisión: se apaga mientras se piensa. La emboscada
+es el único golpe visual del juego: la pantalla se tiñe de rojo y se sacude una vez.
 
-- **Ambiente** — fuego, brasas, estrellas. Permanente y bajo.
-- **Resolución** — 7 segundos, una vez por noche. Es el respiro del ritmo y el momento en que
-  los cinco se callan y miran juntos. Todo lo dramático se guarda para acá.
-- **Alerta** — 1–2 segundos. Apareció un objeto, alguien se quebró.
+Estética: papel recortado y stop-motion ([`estetica.md`](estetica.md)).
 
-El movimiento sincroniza al grupo. Si la pantalla se mueve todo el tiempo, se pierde esa
-herramienta.
+---
 
-**Imágenes**: librería propia de fondos, el modelo elige cuál y con qué tinte. Nada de
-generación en el camino crítico — latencia impredecible y deriva de estilo entre noches.
+## Pantallas: las convenciones
+
+- **Tu color.** Cada asiento tiene un color fijo (`COLORES_ASIENTO` en el core). Es el de tu
+  silueta en la tele y el de tu ficha en la cabecera del celular: te encontrás de un vistazo.
+- **La sala explica el juego.** La tele en la sala muestra las reglas en tres papelitos, el QR
+  y el código grandes, la caravana que se va armando (con lugares vacíos hasta 3) y qué
+  tablero va ganando. Nadie tiene que leer las reglas en voz alta.
+- **El celular siempre tiene la misma forma**: cabecera (tu ficha, las lunas de la noche, la
+  ayuda), un estado (etiqueta chica, titular grande, una línea) y abajo tus dos números:
+  *cargás* (se puede perder) y *tu baúl* (secreto). El color del estado dice cómo te fue:
+  brasa a salvo, rojo te agarraron, verde guardaste.
+- **La decisión ocupa todo el celular.** Dos botones gigantes con lo que implica cada uno
+  ("con 3 más", "guardás 12 + hasta 4 tirados"), el reloj arriba, y vibra cuando se abre.
+- **Volver al asiento es automático.** Si el socket se corta o la página se recarga, el
+  celular se presenta solo con su sesión guardada. Nadie reescribe su nombre en la noche 3.
+- **El perro habla en globo** y tiene tamaño de personaje: es el único dato público.
+- **Movimiento reducido** apaga las animaciones pero nunca la información: el atrapado queda
+  caído igual, la emboscada se tiñe igual.
 
 ---
 
 ## Riesgos conocidos
 
-**El jugador alfa.** Es lo que mata a los coop conversacionales (Pandemic sufre exactamente
-eso). Freno de diseño: la información oculta **no es transferible con precisión** —la Curandera
-ve estados, no números que pueda dictar— y las decisiones se bloquean en secreto, así que el
-alfa puede mandar pero no puede verificar que le hicieron caso.
-
-**La barrera de entrada.** Cinco roles asimétricos es mucho para las once de la noche. Por eso
-la noche 1 decide una sola cosa y el celular da la línea hecha. Si al minuto no están jugando,
-no hay juego.
-
-**Le falta risa.** El diseño es seco y elegante; los party games viven de la carcajada. Válvulas:
-el fogón, los apodos que el camino le pone a cada uno después de la noche 2, y un relato
-deadpan en vez de solemne.
+- **Dos jugadores.** El motor lo permite, pero sin una mesa a quien ganarle lo tirado el juego
+  pierde gracia. La ficha dice 3 a 10.
+- **El arriesgado gana más seguido.** Es el punto, pero si en mesa real gana siempre el mismo
+  tipo de jugador, hay que tocar el mazo (más peligros o hallazgos más bajos).
+- **La cuenta de lo guardado.** El balance de cada noche permite reconstruir los baúles con
+  buena memoria. Se eligió así porque el balance es lo que se comenta; si mata la sorpresa
+  del final, se muestra solo ganó/perdió sin números.

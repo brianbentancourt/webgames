@@ -9,36 +9,45 @@ import {
   VERSION_PROTOCOLO,
   leerEntrante,
   type MensajeSaliente,
-  reducir,
-  registrarTablero,
-  type TableroDato,
+  reducir as reducirMotor,
+  type Resultado,
   proyectarTV,
   proyectarJugador,
-  partidaId,
   type EstadoPartida,
   type Comando,
   type Efecto,
-  type Gatillo,
-  type PedidoRelato,
-  VIGOR_INICIAL,
-  jugadorId,
   type JugadorId,
 } from '@salvese/core';
-import { TABLEROS, validarTableros } from '@salvese/tableros';
+import { TABLEROS, obtenerTablero, validarTableros } from '@salvese/tableros';
 import { config } from './config.js';
 import { crearEstaticos } from './estaticos.js';
 import { JUEGOS, montajes } from './juegos.js';
 import { cerrarSala, crearSala, desconectar, obtenerSala, salaDe, unirse, type Sala, type Asiento } from './salas.js';
 import { randomUUID } from 'node:crypto';
-import { pedirRelato } from './llm/adaptador.js';
 
 validarTableros();
-// El motor de reglas no conoce los tableros por su cuenta: se los damos acá,
-// una sola vez, al arrancar. Antes esto pasaba como side-effect de importar
-// @salvese/tableros, que hacía que "quién registra qué" dependiera del orden
-// de imports en vez de estar escrito en un solo lugar.
-for (const tablero of TABLEROS) {
-  registrarTablero(tablero.id, tablero as unknown as TableroDato);
+
+/**
+ * `reducir()` con red: una excepción del motor rechaza el comando en vez de
+ * tirar abajo el proceso.
+ *
+ * Todas las llamadas al motor salen de un handler de `ws` o de un `setTimeout`,
+ * y en los dos casos una excepción que no se atrapa termina el proceso entero
+ * de Node: no se cae la partida que la provocó, se caen **todas las salas
+ * abiertas**. Ya pasó con una mesa de 8, que salía del array de objetivos del
+ * tablero al repartirlos y tiraba un `TypeError` en `empezar`.
+ *
+ * El motor devuelve rechazos en vez de lanzarlos por diseño (ver `Rechazo` en
+ * maquina.ts), así que cualquier excepción de acá es un bug: se registra fuerte
+ * y se sigue.
+ */
+function reducir(estado: EstadoPartida | null, comando: Comando): Resultado {
+  try {
+    return reducirMotor(estado, comando);
+  } catch (error) {
+    console.error(`[motor] excepción procesando "${comando.t}"`, error);
+    return { ok: false, motivo: 'fuera_de_fase' };
+  }
 }
 
 const montados = montajes();
@@ -97,143 +106,78 @@ function publicarSala(sala: Sala, cuentaRegresiva?: number): void {
   for (const asiento of sala.asientos.values()) enviar(asiento.socket, mensaje);
 }
 
-function publicarVistasPartida(
-  sala: Sala,
-  a: 'todos' | 'tv' | { jugador: JugadorId },
-  gatillos: Gatillo[] = [],
-): void {
-  if (!sala.partida) return;
+/** Lo que le queda a la fase en curso, para que las pantallas pinten su reloj. */
+function restanteMs(sala: Sala): number | null {
+  if (sala.venceEn === undefined) return null;
+  return Math.max(0, sala.venceEn - Date.now());
+}
 
-  if (a === 'todos' || a === 'tv') {
-    const vistaTV = proyectarTV(sala.partida, undefined, gatillos);
-    enviar(sala.tv, { t: 'tv', vista: vistaTV });
-  }
+function publicarVistasPartida(sala: Sala, a: 'todos' | { jugador: JugadorId } = 'todos'): void {
+  if (!sala.partida) return;
+  const restante = restanteMs(sala);
 
   if (a === 'todos') {
-    for (const asiento of sala.asientos.values()) {
-      if (asiento.socket) {
-        const vistaJugador = proyectarJugador(sala.partida, asiento.id);
-        enviar(asiento.socket, { t: 'jugador', vista: vistaJugador });
-      }
-    }
-  } else if (typeof a === 'object' && 'jugador' in a) {
-    const asiento = sala.asientos.get(a.jugador);
-    if (asiento && asiento.socket) {
-      const vistaJugador = proyectarJugador(sala.partida, asiento.id);
-      enviar(asiento.socket, { t: 'jugador', vista: vistaJugador });
-    }
+    const conectados = new Set(
+      [...sala.asientos.values()].filter((x) => x.socket !== null).map((x) => x.id),
+    );
+    enviar(sala.tv, { t: 'tv', vista: proyectarTV(sala.partida, { restanteMs: restante, conectados }) });
   }
+
+  for (const asiento of sala.asientos.values()) {
+    if (asiento.socket === null) continue;
+    if (a !== 'todos' && a.jugador !== asiento.id) continue;
+    const vista = proyectarJugador(sala.partida, asiento.id, { restanteMs: restante });
+    enviar(asiento.socket, vista !== null ? { t: 'jugador', vista } : { t: 'en_espera' });
+  }
+}
+
+/** Corre un comando contra el motor y aplica lo que devuelve. */
+function correr(sala: Sala, comando: Comando): Resultado {
+  const res = reducir(sala.partida ?? null, comando);
+  if (res.ok) {
+    sala.partida = res.estado;
+    aplicarEfectos(sala, res.efectos);
+  }
+  return res;
 }
 
 function aplicarEfectos(sala: Sala, efectos: Efecto[]): void {
   for (const ef of efectos) {
     if (ef.t === 'agendar') {
       if (sala.faseTimerId) clearTimeout(sala.faseTimerId);
+      sala.venceEn = Date.now() + ef.enMs;
       sala.faseTimerId = setTimeout(() => {
-        if (!sala.partida) return;
-        const res = reducir(sala.partida, { t: 'vencio_fase' });
-        if (res.ok) {
-          sala.partida = res.transicion.estado;
-          aplicarEfectos(sala, res.transicion.efectos);
-        }
+        delete sala.faseTimerId;
+        delete sala.venceEn;
+        if (sala.partida) correr(sala, { t: 'vencio_fase' });
       }, ef.enMs);
     } else if (ef.t === 'publicar') {
-      publicarVistasPartida(sala, ef.a, ef.gatillos ?? []);
-    } else if (ef.t === 'pedir_relato') {
-      void pedirRelatoLLM(sala, ef.pedido);
-    } else if (ef.t === 'terminar') {
-      cerrarSala(sala.codigo);
+      publicarVistasPartida(sala);
     }
   }
 }
 
-async function pedirRelatoLLM(sala: Sala, pedido: PedidoRelato) {
-  if (!sala.partida) return;
-  const cronica = sala.partida.cronica;
-  const ultimaCronica = cronica[cronica.length - 1];
-  if (!ultimaCronica) return;
-
-  const respaldoText = ultimaCronica.relato;
-  const resultado = await pedirRelato(pedido, { texto: respaldoText });
-
-  if (!sala.partida) return;
-  const res = reducir(sala.partida, { t: 'relato_listo', escena: pedido.escena, resultado });
-  if (res.ok) {
-    sala.partida = res.transicion.estado;
-    aplicarEfectos(sala, res.transicion.efectos);
-  }
-}
-
-function iniciarPartidaReal(sala: Sala, viajeros: Asiento[]) {
-  const votosTablero = new Map<string, number>();
-  for (const tab of sala.tableroVotado.values()) {
-    votosTablero.set(tab, (votosTablero.get(tab) || 0) + 1);
-  }
-  let tableroElegido = 'la-sierra';
-  let maxVotos = 0;
-  for (const [tab, v] of votosTablero.entries()) {
-    if (v > maxVotos) {
-      maxVotos = v;
-      tableroElegido = tab;
+function iniciarPartida(sala: Sala): void {
+  // El tablero más votado; en empate, el primero de la lista.
+  const conteo = new Map<string, number>();
+  for (const t of sala.tableroVotado.values()) conteo.set(t, (conteo.get(t) ?? 0) + 1);
+  let elegido = TABLEROS[0]!;
+  let max = 0;
+  for (const t of TABLEROS) {
+    const n = conteo.get(t.id) ?? 0;
+    if (n > max) {
+      max = n;
+      elegido = t;
     }
   }
 
-  let estadoPartida: EstadoPartida = {
-    id: partidaId(randomUUID()),
-    tablero: tableroElegido as any,
+  const res = correr(sala, {
+    t: 'empezar',
+    tablero: obtenerTablero(elegido.id) ?? elegido,
     semilla: randomUUID(),
-    fase: 'lobby',
-    noche: 0,
-    nochesTotales: 0,
-    avance: 0,
-    distanciaTotal: 0,
-    recurso: 0,
-    capacidad: 0,
-    viajeros: viajeros.map((a, idx) => ({
-      id: a.id,
-      nombre: a.nombre,
-      rol: 'pasajero',
-      asiento: idx,
-      vigor: VIGOR_INICIAL,
-      objetivo: '' as any,
-      conectado: true,
-      cegado: false,
-      aceptoElTrato: false,
-      listo: true,
-    })),
-    perro: { presente: true, alerta: 'ninguna', dice_la_verdad: true },
-    objetos: [],
-    cronica: [],
-    esfuerzoNocheAnterior: [],
-  };
-
-  let res = reducir(estadoPartida, {
-    t: 'crear',
-    tablero: tableroElegido as any,
-    semilla: estadoPartida.semilla,
+    jugadores: [...sala.asientos.values()].map((a) => ({ id: a.id, nombre: a.nombre })),
   });
-  if (res.ok) {
-    estadoPartida = res.transicion.estado;
-    estadoPartida.viajeros = viajeros.map((a, idx) => ({
-      id: a.id,
-      nombre: a.nombre,
-      rol: 'pasajero',
-      asiento: idx,
-      vigor: VIGOR_INICIAL,
-      objetivo: '' as any,
-      conectado: true,
-      cegado: false,
-      aceptoElTrato: false,
-      listo: true,
-    }));
-    const resEmp = reducir(estadoPartida, { t: 'empezar' });
-    if (resEmp.ok) {
-      sala.partida = resEmp.transicion.estado;
-      aplicarEfectos(sala, resEmp.transicion.efectos);
-    } else {
-      console.error('Error al empezar partida:', resEmp.motivo);
-    }
-  }
+  if (!res.ok) console.error('no se pudo empezar la partida:', res.motivo);
 }
 
 wss.on('connection', (socket) => {
@@ -298,6 +242,9 @@ wss.on('connection', (socket) => {
         enviar(socket, { t: 'error', codigo: 'jugada_invalida', mensaje: 'solo la TV puede quitar jugadores' });
         return;
       }
+      // Con la partida andando, el que se va sigue en la mesa: si no elige,
+      // sigue por defecto. Sacarlo a mitad de una noche rompería el reparto.
+      if (sala.partida) return;
       const jugId = msg.jugador as any;
       const asientoABorrar = sala.asientos.get(jugId);
       if (asientoABorrar) {
@@ -321,62 +268,26 @@ wss.on('connection', (socket) => {
     const asiento = [...sala.asientos.values()].find((a) => a.socket === socket);
 
     if (sala.partida) {
-      let comandoPartida: Comando | null = null;
+      if (asiento === undefined) return;
+      let comando: Comando | null = null;
+      if (msg.t === 'elegir') comando = { t: 'elegir', jugador: asiento.id, opcion: msg.opcion };
+      else if (msg.t === 'revancha')
+        // La mesa de la revancha es la sala de ahora: entran los que llegaron
+        // tarde y quedan afuera los que la TV sacó.
+        comando = {
+          t: 'revancha',
+          jugador: asiento.id,
+          jugadores: [...sala.asientos.values()].map((a) => ({ id: a.id, nombre: a.nombre })),
+        };
 
-      if (msg.t === 'elegir') {
-        if (asiento === undefined) return;
-        comandoPartida = {
-          t: 'elegir',
-          jugador: asiento.id,
-          ruta: msg.ruta as any,
-          raciones: msg.raciones as any,
-        };
-      } else if (msg.t === 'asignar_esfuerzo') {
-        if (asiento === undefined) return;
-        comandoPartida = {
-          t: 'asignar_esfuerzo',
-          jugador: asiento.id,
-          a: msg.a as any,
-        };
-      } else if (msg.t === 'mandar_perro_a_explorar') {
-        if (asiento === undefined) return;
-        comandoPartida = {
-          t: 'mandar_perro_a_explorar',
-          jugador: asiento.id,
-          manda: msg.manda,
-        };
-      } else if (msg.t === 'bloquear') {
-        if (asiento === undefined) return;
-        comandoPartida = {
-          t: 'bloquear',
-          jugador: asiento.id,
-        };
-      } else if (msg.t === 'responder_trato') {
-        if (asiento === undefined) return;
-        comandoPartida = {
-          t: 'responder_trato',
-          jugador: asiento.id,
-          acepta: msg.acepta,
-        };
-      } else if (msg.t === 'entregar_objeto') {
-        if (asiento === undefined) return;
-        comandoPartida = {
-          t: 'entregar_objeto',
-          de: asiento.id,
-          a: msg.a as any,
-        };
+      if (comando === null) {
+        enviar(socket, { t: 'error', codigo: 'fuera_de_fase', mensaje: 'eso no se puede ahora' });
+        return;
       }
-
-      if (comandoPartida !== null) {
-        const res = reducir(sala.partida, comandoPartida);
-        if (res.ok) {
-          sala.partida = res.transicion.estado;
-          aplicarEfectos(sala, res.transicion.efectos);
-        } else {
-          const codigoErr = res.motivo === 'jugador_desconocido' ? 'jugada_invalida' : res.motivo;
-          enviar(socket, { t: 'error', codigo: codigoErr, mensaje: 'movimiento inválido' });
-        }
-      }
+      const res = correr(sala, comando);
+      // Un toque que llega tarde (la ventana ya cerró) no es un error de nadie:
+      // se le repinta el celular con lo que hay y listo.
+      if (!res.ok) publicarVistasPartida(sala, { jugador: asiento.id });
       return;
     }
 
@@ -407,7 +318,7 @@ wss.on('connection', (socket) => {
               sala.lobbyTimerId = setTimeout(tick, 1000);
             } else {
               delete sala.lobbyTimerId;
-              iniciarPartidaReal(sala, viajeros);
+              iniciarPartida(sala);
             }
           };
           tick();

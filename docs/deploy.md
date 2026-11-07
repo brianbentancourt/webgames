@@ -175,25 +175,23 @@ socket inseguro desde ahí. Cualquiera de las opciones de arriba da TLS; lo que 
 puede es servir la página por HTTPS y el socket por `ws://`.
 
 **Keep-alive.** Casi todos los proxies cierran un WebSocket ocioso al minuto, y este
-juego tiene tres minutos de silencio de red mientras la mesa discute. El `ping` cada
-25 segundos ya está en el protocolo ([04](../juegos/salvese/docs/specs/04-protocolo.md)) y no es opcional en
-producción.
+juego puede pasar un rato largo sin tráfico (el final, la sala esperando gente). El
+mensaje `ping` ya está en el protocolo (`juegos/salvese/core/src/protocolo.ts`) y
+mandarlo cada 25 segundos no es opcional en producción.
 
 **Deploy sincronizado.** Cliente y servidor hablan la misma `VERSION_PROTOCOLO` y no
 hay compatibilidad hacia atrás: se despliegan juntos.
 
 **Una partida en curso no sobrevive a un deploy.** El estado está en memoria. Con
-25 minutos por partida y salas que se abren de noche, alcanza con desplegar cuando
+15 minutos por partida y salas que se abren de noche, alcanza con desplegar cuando
 no hay salas activas; un chequeo antes de reiniciar es media hora de trabajo y evita
-cortar una travesía en la noche 4.
+cortar una partida en la noche 4.
 
 ## Variables de entorno
 
 | Variable | Dónde | Sin ella |
 |---|---|---|
 | `PUERTO` | servidor | 8787 |
-| `ANTHROPIC_API_KEY` | servidor | El juego corre entero con los respaldos de cada tablero |
-| `MODELO` | servidor | El rápido y barato por defecto |
 | `VITE_SERVIDOR` | clientes | `ws://localhost:8787`. En la opción 2 no hace falta: mismo origen |
 
 ## Google Cast
@@ -208,12 +206,12 @@ por HTTPS. Lo que hay que saber antes de contarlo como hecho:
 - Para probar hay que registrar el Chromecast propio como dispositivo de desarrollo,
   y tarda un rato en propagarse.
 
-Nada de eso es difícil, pero es un día de trabajo con esperas, no una tarde. Va en
-M5 ([10](../juegos/salvese/docs/specs/10-roadmap.md)), no antes.
+Nada de eso es difícil, pero es un día de trabajo con esperas, no una tarde. Va después
+de que el juego esté calibrado con gente, no antes.
 
 ## Lo que no se despliega todavía
 
 Base de datos: no hay. Si algún día hay que persistir una partida, se persiste **la
 semilla y el log de comandos**, no el estado — el motor es determinista y reconstruye
-el resto ([11](../juegos/salvese/docs/specs/11-testing.md)). Son unos KB por travesía y sirve igual para
+el resto. Son unos KB por partida y sirve igual para
 compartir una crónica que para reproducir un bug.
