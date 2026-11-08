@@ -7,7 +7,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { MensajeEntrante, MensajeSaliente } from '@salvese/core';
-import { decidirPorVersion, CLAVE_REINTENTO_VERSION } from '@salvese/core';
+import { decidirPorVersion, CLAVE_REINTENTO_VERSION, INTERVALO_PING_MS } from '@salvese/core';
 
 export const URL_SERVIDOR: string =
   import.meta.env['VITE_SERVIDOR'] ??
@@ -29,6 +29,8 @@ export function useConexion() {
     let vivo = true;
     let intento = 0;
     let temporizador: ReturnType<typeof setTimeout>;
+    /** El latido que mantiene vivo el socket a través del proxy. */
+    let latido: ReturnType<typeof setInterval> | undefined;
 
     const conectar = () => {
       if (!vivo) return;
@@ -37,12 +39,18 @@ export function useConexion() {
       socket.current = ws;
 
       ws.onopen = () => {
+        clearInterval(latido);
+        latido = setInterval(() => {
+          if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ t: 'ping' } satisfies MensajeEntrante));
+        }, INTERVALO_PING_MS);
         intento = 0;
         setEstado('abierta');
         ws.send(JSON.stringify({ t: 'abrir_sala' } satisfies MensajeEntrante));
       };
       ws.onmessage = (ev) => {
         const msg = JSON.parse(ev.data as string) as MensajeSaliente;
+        // El pong solo confirma que el socket vive: no cambia nada que pintar.
+        if (msg.t === 'pong') return;
         if (msg.t === 'bienvenida') {
           // La TV se queda prendida horas: es la que más probabilidad tiene de
           // atravesar un deploy con el JS viejo en memoria (ver protocolo.ts).
@@ -66,6 +74,7 @@ export function useConexion() {
         setUltimo(msg);
       };
       ws.onclose = () => {
+        clearInterval(latido);
         setEstado('cerrada');
         if (!vivo) return;
         const espera = Math.min(1000 * 2 ** intento++, 8000);
@@ -77,6 +86,7 @@ export function useConexion() {
     return () => {
       vivo = false;
       clearTimeout(temporizador);
+      clearInterval(latido);
       socket.current?.close();
     };
   }, []);

@@ -53,9 +53,10 @@ falta.
 ## Lo que hay que saber
 
 **WebSockets**: Cloudflare los proxea sin configuración. El *idle timeout* es de
-~100 segundos y este juego tiene tres minutos de silencio de red mientras la mesa
-discute, así que el `ping` cada 25 s del protocolo no es opcional. Ya está en
-`juegos/salvese/core/src/protocolo.ts`.
+~100 segundos, y la sala esperando gente o la pantalla final pueden pasar minutos
+sin tráfico. Por eso la TV y el celular mandan `ping` cada 25 s
+(`INTERVALO_PING_MS` en `juegos/salvese/core/src/protocolo.ts`): sin eso, la TV se
+reconecta y abre una sala nueva con otro código.
 
 **Jugando en tu propia casa**, el tráfico sale a Cloudflare y vuelve. Son unos ms y
 no se notan en este juego, pero si molesta, la alternativa es un registro DNS

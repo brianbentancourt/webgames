@@ -30,6 +30,14 @@ import type { VistaJugador, VistaTV } from './vistas.js';
  */
 export const VERSION_PROTOCOLO = 4;
 
+/**
+ * Cada cuánto manda `ping` cada cliente. Cloudflare (y casi todo proxy) corta un
+ * WebSocket sin tráfico a los ~100 segundos. En la partida no pasa —hay mensajes
+ * todo el tiempo—, pero la sala esperando gente o la pantalla final pueden estar
+ * minutos en silencio, y si la TV se corta abre otra sala con otro código.
+ */
+export const INTERVALO_PING_MS = 25_000;
+
 /* ------------------------------------------------------------------ */
 /* cliente → servidor                                                  */
 /* ------------------------------------------------------------------ */
